@@ -1,162 +1,128 @@
 # Postgres Setup
 
-Two ways to run PostgreSQL for the Tasks API: **Docker Compose** (isolated, disposable) or **local Postgres + pgAdmin4** (persistent, manual control). Pick one.
+Docker Compose (isolated, disposable) or local Postgres + pgAdmin4 (persistent). Pick one.
 
-## Toggle: Docker Compose vs Local pgAdmin4
-
-| Feature           | Docker Compose                | Local pgAdmin4                           |
-| ----------------- | ----------------------------- | ---------------------------------------- |
-| Postgres location | Docker container              | Running locally on `localhost:5432`      |
-| pgAdmin4          | Included as `pgadmin` service | Use your installed Mac app               |
-| Data persistence  | Docker volume `pgdata`        | Local Postgres data directory            |
-| Best for          | Fresh starts, CI, sharing     | Existing local DB, manual schema control |
-
-### Option A: Docker Compose (recommended for fresh starts)
+## Option A: Docker Compose (recommended)
 
 > **Sanity check:** If you already have Postgres running locally on port `5432`, stop it first:
 >
 > ```bash
-> # If using Homebrew
 > brew services stop postgresql
-> # Or
+> # or
 > pg_ctl -D /usr/local/var/postgres stop
 > ```
 
-0. Open up Docker Desktop
+### Spin Up
 
-1. Start the stack from `projects/tasks_app/src/tasks_api/`:
+From `projects/tasks_app/`:
 
-   ```bash
-   docker compose up -d
-   ```
+```bash
+docker compose -f docker-compose.postgres.yml up -d
+```
 
-2. Verify both services are healthy:
+Verify:
 
-   ```bash
-   docker compose ps
-   ```
+```bash
+docker compose -f docker-compose.postgres.yml ps
+```
 
-   You should see `db` and `pgadmin` with state `Up`.
+You should see `db` and `pgadmin` with state `Up`.
 
-3. Confirm Postgres is reachable:
+Confirm Postgres is reachable:
 
-   ```bash
-   docker compose exec db pg_isready -U postgres -d TasksApplicationDatabase
-   ```
+```bash
+docker compose -f docker-compose.postgres.yml exec db pg_isready -U postgres -d TasksApplicationDatabase
+```
 
-4. Open pgAdmin4 in your browser:
-   - URL: `http://localhost:5050`
-   - Email: `admin@example.com`
-   - Password: `admin123`
-5. In pgAdmin4, add a server connection:
-   - Click **"Add New Server"** in the _Browser_ panel (left sidebar)
-   - **General** tab:
-     - Name: `Tasks DB` (or anything you like)
-   - **Connection** tab:
-     - Host: `db` (the docker service name)
-     - Port: `5432`
-     - Maintenance database: `TasksApplicationDatabase`
-     - Username: `postgres`
-     - Password: `12345678`
-   - Click **Save**
-   - You should now see `Tasks DB` under _Servers_ in the Browser panel. Expand it → _Databases_ → `TasksApplicationDatabase` → _Schemas_ → _Tables_
-6. Seed the schema and admin user (see below).
+Open pgAdmin4: http://localhost:5050
 
-### Option B: Local Postgres + pgAdmin4 Mac App
+- Email: `admin@example.com`
+- Password: `.env.ADMIN_PASSWORD`
+
+Add a server connection in pgAdmin4:
+
+- **General:** Name: `Tasks DB`
+- **Connection:**
+  - Host: `db`
+  - Port: `5432`
+  - Maintenance database: `TasksApplicationDatabase`
+  - Username: `postgres`
+  - Password: `.env.POSTGRES_PASSWORD`
+
+### 3. Point the app at Postgres
+
+In `.env`, uncomment the Postgres `DATABASE_URL`:
+
+```bash
+DATABASE_URL=postgresql+psycopg://postgres:<.env.POSTGRES_PASSWORD>@localhost:5432/TasksApplicationDatabase
+```
+
+### 4. Start the app
+
+```bash
+uv run tasks-api
+```
+
+The app's `init_db()` auto-creates the `users` and `tasks` tables on startup.
+
+### 5. Seed the admin user
+
+In another terminal:
+
+```bash
+uv run python scripts/seed.py
+```
+
+This reads `ADMIN_USER`, `ADMIN_PASSWORD`, etc. from `.env` and creates the admin user.
+
+### 6. Log in
+
+- Open http://127.0.0.1:8000/docs
+- Use `/auth/token` with:
+  - **username:** `admin`
+  - **password:** `.env.ADMIN_PASSWORD`
+
+### Spin Down
+
+From `projects/tasks_app/`:
+
+```bash
+docker compose -f docker-compose.postgres.yml down
+```
+
+### Wipe data
+
+From `projects/tasks_app/`:
+
+```bash
+docker compose -f docker-compose.postgres.yml down -v
+```
+
+## Option B: Local Postgres + pgAdmin4 Mac App
 
 1. Start your local Postgres:
-
    ```bash
-   # Homebrew example
    brew services start postgresql
    ```
-
-2. Create the database if needed:
-
+2. Create the database:
    ```bash
    createdb TasksApplicationDatabase
    ```
-
 3. Open your **pgAdmin4 Mac app** and connect to `localhost:5432`.
-4. Seed the schema and admin user (see below).
+4. Start the app — it auto-creates tables via `init_db()`.
+5. Seed the admin user (see below).
 
 ## Seeding the Database
 
-**Tables are created by Alembic migrations.** After starting Postgres, run:
+After the app has started (tables auto-created), seed the admin user:
 
 ```bash
-uv run alembic upgrade head
-```
-
-This applies the initial migration and creates `users` and `tasks` tables.
-
-The steps below are for **local Postgres clients** or if you want to reset the schema manually. Only Step 2 (admin user) is truly required to get a working login.
-
-### 1. Run migrations (or create tables manually)
-
-If you're using pgAdmin4 or a local Postgres client and want to create/reset the schema manually:
-
-```sql
-DROP TABLE IF EXISTS users;
-DROP TABLE IF EXISTS tasks;
-
-CREATE TABLE users(
-    id SERIAL PRIMARY KEY,
-    username VARCHAR(255) NOT NULL,
-    email VARCHAR(255) NOT NULL,
-    first_name VARCHAR(255),
-    last_name VARCHAR(255),
-    hashed_password VARCHAR(255) NOT NULL,
-    is_active BOOLEAN DEFAULT TRUE,
-    role VARCHAR(255) DEFAULT 'user'
-);
-
-CREATE TABLE tasks(
-    id SERIAL PRIMARY KEY,
-    title VARCHAR(255),
-    description VARCHAR(500),
-    priority INTEGER,
-    completed BOOLEAN DEFAULT FALSE,
-    owner_id INTEGER REFERENCES users(id)
-);
-```
-
-Alternatively, use Alembic (recommended for ongoing development):
-
-```bash
-uv run alembic upgrade head
-```
-
-### 2. Create admin user
-
-Pick a password, then generate its bcrypt hash using the project venv:
-
-```bash
-/Users/craigcurtis/workbench/python/fastapi-backend/.venv/bin/python -c "
-from passlib.context import CryptContext
-c = CryptContext(schemes=['bcrypt'], deprecated='auto')
-print(c.hash('YOUR_PASSWORD_HERE'))
-"
-```
-
-Replace `YOUR_PASSWORD_HERE` with your chosen password, then run:
-
-```sql
-INSERT INTO users (username, email, first_name, last_name, hashed_password, is_active, role)
-VALUES (
-  'admin',
-  'admin@example.com',
-  'Admin',
-  'User',
-  '<paste-hash-here>',
-  true,
-  'admin'
-);
+uv run python scripts/seed.py
+# or with a custom password:
+uv run python scripts/seed.py --password mypassword
 ```
 
 ## Sanity Checks
-
-### Verify app connects to Postgres
 
 Start the API:
 
@@ -164,53 +130,32 @@ Start the API:
 uv run tasks-api
 ```
 
-In another terminal, confirm the app is using Postgres (not SQLite). If you see Postgres connection errors, check `.env`:
+Test login:
 
 ```bash
-# projects/tasks_app/.env
-DATABASE_URL=postgresql+psycopg://postgres:<password>@localhost:5432/TasksApplicationDatabase
-```
-
-To force SQLite (local fallback), comment out `DATABASE_URL` in `.env`. The app will then use `data/tasksapp.db`.
-
-### Test login
-
-```bash
+ADMIN_USER=$(grep ADMIN_USER .env | cut -d= -f2)
+ADMIN_PASSWORD=$(grep ADMIN_PASSWORD .env | cut -d= -f2)
 curl -X POST http://127.0.0.1:8000/auth/token \
-  -d "username=admin" \
-  -d "password=YOUR_PASSWORD_HERE"
+  -d "username=$ADMIN_USER" \
+  -d "password=$ADMIN_PASSWORD"
 ```
-
-You should get a JSON response with `access_token`.
 
 ## Switching Backends
 
-To toggle between Postgres and SQLite, edit `.env`:
+Change `DATABASE_URL` in `.env`, then repeat migrations and seeding for the new database.
+
+## Testing Against Postgres
+
+> **Note:** Tests use a separate database (`TasksApplicationDatabase_test`). Create it first:
 
 ```bash
-# Postgres (requires running DB)
-DATABASE_URL=postgresql+psycopg://postgres:12345678@localhost:5432/TasksApplicationDatabase
-
-# SQLite (default local file)
-# DATABASE_URL=
+docker compose -f docker-compose.postgres.yml exec db psql -U postgres -c "CREATE DATABASE \"TasksApplicationDatabase_test\";"
 ```
 
-Restart the app after changing `.env`.
-
-## Resetting Data
-
-### Docker Compose
+Then run:
 
 ```bash
-docker compose down -v   # WARNING: deletes all data in pgdata volume
-docker compose up -d
-docker compose ps         # check containers are running
+TEST_DATABASE_URL=postgresql+psycopg://postgres:12345678@localhost:5432/TasksApplicationDatabase_test uv run pytest projects/tasks_app/tests/ -v
 ```
 
-### Local Postgres
-
-```bash
-dropdb TasksApplicationDatabase
-createdb TasksApplicationDatabase
-uv run alembic upgrade head
-```
+> If you used Docker Compose, use host `localhost` (not `db`) in the connection string since the tests run outside Docker.

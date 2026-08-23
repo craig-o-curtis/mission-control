@@ -8,7 +8,9 @@ class TestRoot:
         assert response.status_code == 200
         data = response.json()
         assert data["name"] == "Tasks App"
+        assert data["version"] == "1.0.0"
         assert data["status"] == "running"
+        assert data["docs"] == "/docs"
 
 
 class TestReadTasks:

@@ -1,146 +1,110 @@
 # MySQL Setup
 
-Two ways to run MySQL for the Tasks API: **Docker Compose** (isolated, disposable) or **local MySQL Mac app** (persistent, manual control). Pick one.
+Docker Compose (isolated, disposable) or local MySQL Mac app (persistent). Pick one.
 
-## Toggle: Docker Compose vs Local MySQL
+## Option A: Docker Compose (recommended)
 
-| Feature          | Docker Compose            | Local MySQL Mac app                      |
-| ---------------- | ------------------------- | ---------------------------------------- |
-| MySQL location   | Docker container          | Running locally on `localhost:3306`      |
-| Admin GUI        | Adminer (port `8080`)     | Use your installed Mac app               |
-| Data persistence | Docker volume `mysqldata` | Local MySQL data directory               |
-| Best for         | Fresh starts, CI, sharing | Existing local DB, manual schema control |
+> **Sanity check:** If you already have MySQL running locally on port `3306`, stop it first.
 
-### Option A: Docker Compose (recommended for fresh starts)
+### Spin Up
 
-> **Sanity check:** If you already have MySQL running locally on port `3306`, stop it first before bringing up the stack.
+From `projects/tasks_app/`:
 
-1. Start the stack from `projects/tasks_app/`:
+```bash
+docker compose -f docker-compose.mysql.yml up -d
+```
 
-    ```bash
-    docker compose -f src/tasks_api/docker-compose.mysql.yml up -d
-    ```
+Verify:
 
-2. Verify both services are healthy:
+```bash
+docker compose -f docker-compose.mysql.yml ps
+```
 
-    ```bash
-    docker compose -f src/tasks_api/docker-compose.mysql.yml ps
-    ```
+You should see `mysql` and `adminer` with state `Up`.
 
-    You should see `mysql` and `adminer` with state `Up`.
+Confirm MySQL is reachable:
 
-3. Confirm MySQL is reachable:
+```bash
+docker compose -f docker-compose.mysql.yml exec mysql mysqladmin ping -h localhost -u root -p12345678
+```
 
-    ```bash
-    docker compose -f src/tasks_api/docker-compose.mysql.yml exec mysql mysqladmin ping -h localhost -u root -p12345678
-    ```
+Open Adminer: http://localhost:8080
 
-4. Open Adminer in your browser:
-   - URL: `http://localhost:8080`
+Log in to Adminer:
 
-5. Log in to Adminer:
-   - System: `MySQL`
-   - Server: `mysql`
-   - Username: `root`
-    - Password: `12345678`
-    - Database: `tasks_application_database`
-6. Seed the schema and admin user (see below).
+- System: `MySQL`
+- Server: `mysql`
+- Username: `root`
+- Password: `.env.MYSQL_ROOT_PASSWORD`
+- Database: `tasks_application_database`
 
-### Option B: Local MySQL Mac App
+### 3. Point the app at MySQL
 
-1. Start your local MySQL server (e.g. via Homebrew or the Mac app).
+In `.env`, uncomment the MySQL `DATABASE_URL`:
 
-2. Create the database if needed:
+### 4. Start the app
 
-    ```bash
-    mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS tasks_application_database;"
-    ```
+```bash
+uv run tasks-api
+```
 
-3. Connect using Adminer (if running via Docker) or a local client like Sequel Ace:
-    - Server: `localhost`
-    - Port: `3306`
-    - Username: `root`
-    - Password: `<your local root password>`
- 4. Seed the schema and admin user (see below).
+The app's `init_db()` auto-creates the `users` and `tasks` tables on startup.
+
+### 5. Seed the admin user
+
+In another terminal:
+
+```bash
+uv run python scripts/seed.py
+```
+
+This reads `ADMIN_USER`, `ADMIN_PASSWORD`, etc. from `.env` and creates the admin user.
+
+### 6. Log in
+
+- Open http://127.0.0.1:8000/docs
+- Use `/auth/token` with:
+  - **username:** `admin`
+  - **password:** `.env.ADMIN_PASSWORD`
+
+### Spin Down
+
+From `projects/tasks_app/`:
+
+```bash
+docker compose -f docker-compose.mysql.yml down
+```
+
+### Wipe data
+
+From `projects/tasks_app/`:
+
+```bash
+docker compose -f docker-compose.mysql.yml down -v
+```
+
+## Option B: Local MySQL Mac App
+
+1. Start your local MySQL server.
+2. Create the database:
+   ```bash
+   mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS tasks_application_database;"
+   ```
+3. Connect using Adminer (Docker) or a local client like Sequel Ace.
+4. Start the app — it auto-creates tables via `init_db()`.
+5. Seed the admin user (see below).
 
 ## Seeding the Database
 
-**Tables are created by Alembic migrations.** After starting MySQL, run:
+After the DB is running and the app has started (tables auto-created), seed the admin user:
 
 ```bash
-uv run alembic upgrade head
-```
-
-This applies the initial migration and creates `users` and `tasks` tables.
-
-The steps below are for **local MySQL clients** or if you want to reset the schema manually. Only Step 2 (admin user) is truly required to get a working login.
-
-### 1. Run migrations (or create tables manually)
-
-If you're using Adminer or a local MySQL client and want to create/reset the schema manually:
-
-```sql
-DROP TABLE IF EXISTS users;
-DROP TABLE IF EXISTS tasks;
-
-CREATE TABLE users(
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    username VARCHAR(255) NOT NULL,
-    email VARCHAR(255) NOT NULL,
-    first_name VARCHAR(255),
-    last_name VARCHAR(255),
-    hashed_password VARCHAR(255) NOT NULL,
-    is_active BOOLEAN DEFAULT TRUE,
-    role VARCHAR(255) DEFAULT 'user'
-);
-
-CREATE TABLE tasks(
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    title VARCHAR(255),
-    description VARCHAR(255),
-    priority INTEGER,
-    completed BOOLEAN DEFAULT FALSE,
-    owner_id INTEGER,
-    FOREIGN KEY (owner_id) REFERENCES users(id)
-);
-```
-
-Alternatively, use Alembic (recommended for ongoing development):
-
-```bash
-uv run alembic upgrade head
-```
-
-### 2. Create admin user (required for login)
-
-Pick a password, then generate its bcrypt hash using the project venv:
-
-```bash
-/Users/craigcurtis/workbench/python/fastapi-backend/.venv/bin/python -c "
-from passlib.context import CryptContext
-c = CryptContext(schemes=['bcrypt'], deprecated='auto')
-print(c.hash('YOUR_PASSWORD_HERE'))
-"
-```
-
-Replace `YOUR_PASSWORD_HERE` with your chosen password, then run:
-
-```sql
-INSERT INTO users (username, email, first_name, last_name, hashed_password, is_active, role)
-VALUES (
-  'admin',
-  'admin@example.com',
-  'Admin',
-  'User',
-  '<paste-hash-here>',
-  true,
-  'admin'
-);
+uv run python scripts/seed.py
+# or with a custom password:
+uv run python scripts/seed.py --password mypassword
 ```
 
 ## Sanity Checks
-
-### Verify app connects to MySQL
 
 Start the API:
 
@@ -148,59 +112,55 @@ Start the API:
 uv run tasks-api
 ```
 
-In another terminal, confirm the app is using MySQL (not SQLite or Postgres). If you see connection errors, check `.env`:
+Test login:
 
 ```bash
-# projects/tasks_app/.env
-DATABASE_URL=mysql+pymysql://root:12345678@localhost:3306/tasks_application_database
-```
-
-To force SQLite (local fallback), comment out `DATABASE_URL` in `.env`. The app will then use `data/tasksapp.db`.
-
-### Test login
-
-```bash
+ADMIN_USER=$(grep ADMIN_USER .env | cut -d= -f2)
+ADMIN_PASSWORD=$(grep ADMIN_PASSWORD .env | cut -d= -f2)
 curl -X POST http://127.0.0.1:8000/auth/token \
-  -d "username=admin" \
-  -d "password=YOUR_PASSWORD_HERE"
+  -d "username=$ADMIN_USER" \
+  -d "password=$ADMIN_PASSWORD"
 ```
-
-You should get a JSON response with `access_token`.
 
 ## Switching Backends
 
-To toggle between MySQL, Postgres, and SQLite, edit `.env`:
+Change `DATABASE_URL` in `.env`, then repeat migrations and seeding for the new database.
+
+## Testing Against MySQL
+
+> **Note:** Tests use a separate database (`tasks_application_database_test`). Create it first:
 
 ```bash
-# MySQL (requires running DB)
-DATABASE_URL=mysql+pymysql://root:12345678@localhost:3306/tasks_application_database
-
-# PostgreSQL
-DATABASE_URL=postgresql+psycopg://postgres:12345678@localhost:5432/TasksApplicationDatabase
-
-# SQLite (default local file)
-# DATABASE_URL=
+docker compose -f docker-compose.mysql.yml exec mysql mysql -u root -p12345678 -e "CREATE DATABASE IF NOT EXISTS tasks_application_database_test;"
 ```
 
-Restart the app after changing `.env`. After switching, apply migrations to the new database:
+Then run:
 
 ```bash
-uv run alembic upgrade head
+TEST_DATABASE_URL=mysql+pymysql://root:12345678@localhost:3306/tasks_application_database_test uv run pytest projects/tasks_app/tests/ -v
 ```
 
-## Resetting Data
+> If you used Docker Compose, use host `localhost` (not `mysql`) in the connection string since the tests run outside Docker.
 
-### Docker Compose
+## Docker Compose Environment Variables
+
+Docker Compose reads secrets from `.env` in the project root. Copy `.env.example` to `.env` and change the defaults before starting:
 
 ```bash
-docker compose -f src/tasks_api/docker-compose.mysql.yml down -v   # WARNING: deletes all data in mysqldata volume
-docker compose -f src/tasks_api/docker-compose.mysql.yml up -d
-docker compose -f src/tasks_api/docker-compose.mysql.yml ps
+cp .env.example .env
+# Edit .env and change MYSQL_ROOT_PASSWORD / POSTGRES_PASSWORD etc.
 ```
 
-### Local MySQL
-
-```bash
-mysql -u root -p -e "DROP DATABASE tasks_application_database; CREATE DATABASE tasks_application_database;"
-uv run alembic upgrade head
-```
+| Variable                   | Default                      | Description             |
+| -------------------------- | ---------------------------- | ----------------------- |
+| `MYSQL_ROOT_PASSWORD`      | `.env.MYSQL_ROOT_PASSWORD`   | MySQL root password     |
+| `MYSQL_DATABASE`           | `tasks_application_database` | Database name           |
+| `MYSQL_PORT`               | `3306`                       | Host port for MySQL     |
+| `ADMINER_PORT`             | `8080`                       | Host port for Adminer   |
+| `POSTGRES_USER`            | `postgres`                   | Postgres superuser      |
+| `POSTGRES_PASSWORD`        | `.env.POSTGRES_PASSWORD`     | Postgres root password  |
+| `POSTGRES_DB`              | `TasksApplicationDatabase`   | Database name           |
+| `POSTGRES_PORT`            | `5432`                       | Host port for Postgres  |
+| `PGADMIN_DEFAULT_EMAIL`    | `admin@example.com`          | pgAdmin4 login email    |
+| `PGADMIN_DEFAULT_PASSWORD` | `.env.ADMIN_PASSWORD`        | pgAdmin4 login password |
+| `PGADMIN_PORT`             | `5050`                       | Host port for pgAdmin4  |

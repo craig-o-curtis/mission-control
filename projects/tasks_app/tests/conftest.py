@@ -1,4 +1,4 @@
-import tempfile
+import os
 from collections.abc import Generator
 from typing import Annotated
 
@@ -6,8 +6,9 @@ import pytest
 from fastapi import Depends
 from fastapi.testclient import TestClient
 from jose import jwt
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 from tasks_api.app import app
 from tasks_api.database import Base
 from tasks_api.dependencies.db_dep import DbDep, get_db
@@ -20,9 +21,33 @@ _FAKE_HASH = bcrypt_context.hash("fakepass123")
 _SECRET = "test-secret-key-for-testing-only"
 _ALGO = "HS256"
 
+TEST_DATABASE_URL = os.getenv(
+    "TEST_DATABASE_URL",
+    "sqlite:///:memory:",
+)
+
+
+def _get_connect_args(database_url: str) -> dict[str, object]:
+    if database_url.startswith("sqlite"):
+        return {"check_same_thread": False}
+    return {}
+
+
+def _get_poolclass(database_url: str):
+    if database_url.startswith("sqlite"):
+        return StaticPool
+    return None
+
+
+_TEST_TOKEN_CACHE = None
+
 
 def _make_token(username: str, user_id: int, role: str) -> str:
-    """Create a test JWT access token."""
+    global _TEST_TOKEN_CACHE
+    if _TEST_TOKEN_CACHE is not None:
+        payload = jwt.decode(_TEST_TOKEN_CACHE, _SECRET, algorithms=[_ALGO])
+        if payload.get("sub") == username and payload.get("id") == user_id:
+            return _TEST_TOKEN_CACHE
     from datetime import UTC, datetime, timedelta
 
     encode = {
@@ -31,7 +56,11 @@ def _make_token(username: str, user_id: int, role: str) -> str:
         "role": role,
         "exp": datetime.now(UTC) + timedelta(hours=1),
     }
-    return jwt.encode(encode, _SECRET, algorithm=_ALGO)
+    _TEST_TOKEN_CACHE = jwt.encode(encode, _SECRET, algorithm=_ALGO)
+    return _TEST_TOKEN_CACHE
+
+
+# ── User fixtures ──────────────────────────────────────────────────
 
 
 @pytest.fixture
@@ -73,35 +102,127 @@ def fake_admin_user() -> User:
     )
 
 
+# ── Task fixtures ──────────────────────────────────────────────────
+
+
 @pytest.fixture
-def api_client(fake_user: User) -> Generator[TestClient]:
-    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as db_file:
-        db_path = db_file.name
-    engine = create_engine(
-        f"sqlite:///{db_path}",
-        connect_args={"check_same_thread": False},
+def fake_task(fake_user: User) -> Task:
+    """Create a default task owned by fake_user."""
+    return Task(
+        title="Test Task",
+        description="A test task.",
+        priority=1,
+        completed=False,
+        owner_id=fake_user.id,
     )
-    TestSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    Base.metadata.create_all(bind=engine)
 
-    # Insert the user into the DB so authenticate_user can find them
-    with TestSessionLocal() as db:
-        db.add(fake_user)
-        db.commit()
-        db.refresh(fake_user)
 
-    task = Task(title="Test Task", description="A test task.", owner_id=fake_user.id)
-    with TestSessionLocal() as db:
-        db.add(task)
-        db.commit()
-        db.refresh(task)
+@pytest.fixture
+def fake_admin_task(fake_admin_user: User) -> Task:
+    """Create a default task owned by fake_admin_user."""
+    return Task(
+        title="Admin Test Task",
+        description="A task for admin testing.",
+        priority=2,
+        completed=False,
+        owner_id=fake_admin_user.id,
+    )
+
+
+@pytest.fixture
+def fake_second_user_task(fake_second_user: User) -> Task:
+    """Create a task owned by fake_second_user for isolation tests."""
+    return Task(
+        title="Other User's Task",
+        description="Owned by second user.",
+        priority=1,
+        completed=False,
+        owner_id=fake_second_user.id,
+    )
+
+
+# ── Database fixtures ─────────────────────────────────────────────
+
+
+@pytest.fixture(scope="session")
+def test_engine():
+    """Create a test database engine (session-scoped for efficiency)."""
+    try:
+        engine = create_engine(
+            TEST_DATABASE_URL,
+            connect_args=_get_connect_args(TEST_DATABASE_URL),
+            poolclass=_get_poolclass(TEST_DATABASE_URL),
+        )
+    except ImportError as e:
+        raise ImportError(
+            f"Cannot create test engine for {TEST_DATABASE_URL!r}. "
+            "Make sure the DB driver is installed: "
+            "psycopg for Postgres, pymysql for MySQL. "
+            f"Original error: {e}"
+        ) from e
+    yield engine
+    engine.dispose()
+
+
+@pytest.fixture(scope="session")
+def test_tables(test_engine):
+    """Create tables once per test session, drop them at the end."""
+    Base.metadata.create_all(bind=test_engine, checkfirst=True)
+    yield
+    Base.metadata.drop_all(bind=test_engine, checkfirst=True)
+
+
+@pytest.fixture
+def test_session(test_engine, test_tables):
+    """Create a test database session and clear all tables before each test."""
+    TestingSessionLocal = sessionmaker(
+        autocommit=False, autoflush=False, bind=test_engine
+    )
+    session = TestingSessionLocal()
+
+    # Disable FK checks for MySQL during cleanup, then re-enable
+    if TEST_DATABASE_URL.startswith("mysql"):
+        session.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
+
+    for table in reversed(Base.metadata.sorted_tables):
+        session.execute(table.delete())
+    session.commit()
+
+    if TEST_DATABASE_URL.startswith("mysql"):
+        for table in Base.metadata.sorted_tables:
+            session.execute(text(f"ALTER TABLE {table.name} AUTO_INCREMENT = 1"))
+        session.commit()
+
+    if TEST_DATABASE_URL.startswith("postgresql"):
+        for table in Base.metadata.sorted_tables:
+            session.execute(
+                text(
+                    f"SELECT setval(pg_get_serial_sequence("
+                    f"'{table.name}', 'id'), 1, false)"
+                )
+            )
+        session.commit()
+
+    if TEST_DATABASE_URL.startswith("mysql"):
+        session.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
+
+    yield session
+    session.close()
+
+
+# ── Client fixtures ────────────────────────────────────────────────
+
+
+@pytest.fixture
+def api_client(fake_user: User, fake_task: Task, test_session) -> Generator[TestClient]:
+    """Client authenticated as a regular user with a default task in DB."""
+    test_session.add(fake_user)
+    test_session.flush()
+    test_session.add(fake_task)
+    test_session.commit()
 
     def override_get_db():
-        db = TestSessionLocal()
-        try:
-            yield db
-        finally:
-            db.close()
+        yield test_session
 
     def override_get_current_user(
         db: Annotated[DbDep, Depends(get_db)],
@@ -112,42 +233,20 @@ def api_client(fake_user: User) -> Generator[TestClient]:
     app.dependency_overrides[get_current_user] = override_get_current_user
     yield TestClient(app)
     app.dependency_overrides.clear()
-    engine.dispose()
 
 
 @pytest.fixture
-def admin_client(fake_admin_user: User) -> Generator[TestClient]:
-    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as db_file:
-        db_path = db_file.name
-    engine = create_engine(
-        f"sqlite:///{db_path}",
-        connect_args={"check_same_thread": False},
-    )
-    TestSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    Base.metadata.create_all(bind=engine)
-
-    # Insert the admin user into the DB so admin endpoints can find it
-    with TestSessionLocal() as db:
-        db.add(fake_admin_user)
-        db.commit()
-        db.refresh(fake_admin_user)
-
-    task = Task(
-        title="Admin Test Task",
-        description="A task for admin testing.",
-        owner_id=fake_admin_user.id,
-    )
-    with TestSessionLocal() as db:
-        db.add(task)
-        db.commit()
-        db.refresh(task)
+def admin_client(
+    fake_admin_user: User, fake_admin_task: Task, test_session
+) -> Generator[TestClient]:
+    """Client authenticated as an admin user with a default admin task in DB."""
+    test_session.add(fake_admin_user)
+    test_session.flush()
+    test_session.add(fake_admin_task)
+    test_session.commit()
 
     def override_get_db():
-        db = TestSessionLocal()
-        try:
-            yield db
-        finally:
-            db.close()
+        yield test_session
 
     def override_get_current_user(
         db: Annotated[DbDep, Depends(get_db)],
@@ -158,22 +257,11 @@ def admin_client(fake_admin_user: User) -> Generator[TestClient]:
     app.dependency_overrides[get_current_user] = override_get_current_user
     yield TestClient(app)
     app.dependency_overrides.clear()
-    engine.dispose()
 
 
 @pytest.fixture
-def no_auth_client() -> Generator[TestClient]:
+def no_auth_client(test_session) -> Generator[TestClient]:
     """Client with no authentication override — for testing auth/login endpoints."""
-    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as db_file:
-        db_path = db_file.name
-    engine = create_engine(
-        f"sqlite:///{db_path}",
-        connect_args={"check_same_thread": False},
-    )
-    TestSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    Base.metadata.create_all(bind=engine)
-
-    # Insert a user so login can find them
     user = User(
         id=1,
         username="testuser",
@@ -182,62 +270,35 @@ def no_auth_client() -> Generator[TestClient]:
         is_active=True,
         role="user",
     )
-    with TestSessionLocal() as db:
-        db.add(user)
-        db.commit()
-        db.refresh(user)
+    test_session.add(user)
+    test_session.flush()
+    test_session.commit()
 
-    # Also store a token in the app so auth tests can use it
     app.state.test_token = _make_token("testuser", 1, "user")
 
     def override_get_db():
-        db = TestSessionLocal()
-        try:
-            yield db
-        finally:
-            db.close()
+        yield test_session
 
     app.dependency_overrides[get_db] = override_get_db
-    # Do NOT override get_current_user — auth endpoint doesn't use it,
-    # but other endpoints would fail without auth. This fixture is for
-    # testing the /auth/token endpoint only.
     yield TestClient(app)
     app.dependency_overrides.clear()
-    engine.dispose()
 
 
 @pytest.fixture
-def isolation_client(fake_user: User, fake_second_user: User) -> Generator[TestClient]:
-    """Client authenticated as user 1, but DB has a task owned by user 2.
-    Used to test owner isolation — user 1 should NOT see/update/delete user 2's task.
-    """
-    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as db_file:
-        db_path = db_file.name
-    engine = create_engine(
-        f"sqlite:///{db_path}",
-        connect_args={"check_same_thread": False},
-    )
-    TestSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    Base.metadata.create_all(bind=engine)
-
-    # Insert user 2's task (owned by fake_second_user, not fake_user)
-    task = Task(
-        title="Other User's Task",
-        description="Owned by second user.",
-        owner_id=fake_second_user.id,
-    )
-    with TestSessionLocal() as db:
-        db.add(fake_second_user)
-        db.add(task)
-        db.commit()
-        db.refresh(task)
+def isolation_client(
+    fake_user: User,
+    fake_second_user: User,
+    fake_second_user_task: Task,
+    test_session,
+) -> Generator[TestClient]:
+    """Client authenticated as user 1, but DB has a task owned by user 2."""
+    test_session.add(fake_second_user)
+    test_session.flush()
+    test_session.add(fake_second_user_task)
+    test_session.commit()
 
     def override_get_db():
-        db = TestSessionLocal()
-        try:
-            yield db
-        finally:
-            db.close()
+        yield test_session
 
     def override_get_current_user() -> User:
         return fake_user
@@ -246,4 +307,23 @@ def isolation_client(fake_user: User, fake_second_user: User) -> Generator[TestC
     app.dependency_overrides[get_current_user] = override_get_current_user
     yield TestClient(app)
     app.dependency_overrides.clear()
-    engine.dispose()
+
+
+def _db_label() -> str:
+    if TEST_DATABASE_URL.startswith("postgresql"):
+        return "POSTGRES"
+    if TEST_DATABASE_URL.startswith("mysql"):
+        return "MYSQL"
+    return "SQLITE"
+
+
+def pytest_sessionstart(session: pytest.Session) -> None:
+    """Shows which db was used in the test run."""
+    label = _db_label()
+    print(f"\n*********** {label} ***************")
+    print(f"TEST_DATABASE_URL={TEST_DATABASE_URL!r}\n")
+
+
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
+    """Shows which db was used in the test run."""
+    print(f"\n*********** {_db_label()} DONE ***************\n")

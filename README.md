@@ -44,6 +44,16 @@ uv run ruff format --check .           # format-check everything
 uv run ty check projects/ libs/        # type-check everything
 ```
 
+Tests default to an in-memory SQLite database. To run the tasks_app test suite against a real database, set `TEST_DATABASE_URL`:
+
+```bash
+# Postgres
+TEST_DATABASE_URL=postgresql+psycopg://postgres:<.env.TEST_POSTGRES_PASSWORD>@localhost:5432/TasksApplicationDatabase uv run pytest projects/tasks_app/tests/ -v
+
+# MySQL
+TEST_DATABASE_URL=mysql+pymysql://root:<.env.MYSQL_ROOT_PASSWORD>@localhost:3306/tasks_application_database uv run pytest projects/tasks_app/tests/ -v
+```
+
 To scope to a single project:
 
 ```bash

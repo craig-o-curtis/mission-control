@@ -4,12 +4,14 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from tasks_api.database import init_db
 from tasks_api.routers import admin, auth, tasks, users
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown events."""
+    init_db()
     yield
 
 
