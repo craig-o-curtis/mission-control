@@ -18,7 +18,7 @@ dev = [
 ]
 
 [tool.uv.workspace]
-members = ["projects/*", "libs/*"]
+members = ["projects/books_api", "projects/tasks_app", "libs/shared"]
 
 [tool.uv.sources]
 shared = { workspace = true }

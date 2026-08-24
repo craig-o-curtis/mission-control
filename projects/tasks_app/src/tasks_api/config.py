@@ -18,3 +18,10 @@ DATABASE_URL = os.getenv(
     "DATABASE_URL",
     f"sqlite:///{DATA_DIR / 'tasksapp.db'}",
 )
+
+# Render injects a `postgres://` URL, but SQLAlchemy needs the explicit psycopg3
+# driver. Normalize the scheme so it works on Render and still works locally.
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+psycopg://", 1)
+elif DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg://", 1)

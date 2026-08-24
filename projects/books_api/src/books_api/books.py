@@ -1,4 +1,7 @@
+import os
+
 from fastapi import FastAPI, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from shared.api_utils import is_casefold_match, is_positive_integer
 
@@ -23,6 +26,20 @@ app = FastAPI(
     title="Books API",
     description="A simple API to manage a collection of books.",
     version="1.0.0",
+)
+
+ALLOWED_ORIGINS = [
+    origin.strip().rstrip("/")
+    for origin in os.getenv("CORS_ORIGINS", "*").split(",")
+    if origin.strip()
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 ## Read Endpoints
