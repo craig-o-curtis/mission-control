@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from tasks_api.bootstrap import ensure_admin
+from tasks_api.bootstrap import ensure_seed_data
 from tasks_api.database import init_db
 from tasks_api.routers import admin, auth, tasks, users
 
@@ -15,7 +15,7 @@ from tasks_api.routers import admin, auth, tasks, users
 async def lifespan(app: FastAPI):
     """Startup and shutdown events."""
     init_db()
-    ensure_admin()
+    ensure_seed_data()
     yield
 
 

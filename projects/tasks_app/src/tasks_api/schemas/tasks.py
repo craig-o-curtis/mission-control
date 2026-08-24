@@ -9,6 +9,7 @@ class ReadTaskRequest(BaseModel):
     description: str | None
     priority: int | None
     completed: bool
+    seeded: bool
 
     # This is key: tells pydantic to read from the SQLAlchemy model attributes,
     # not just the dict.

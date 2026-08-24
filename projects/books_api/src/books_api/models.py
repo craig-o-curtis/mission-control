@@ -47,6 +47,10 @@ class Book(BookBase):
     """A book with an ID."""
 
     id: int = Field(ge=1, description="The unique identifier of the book.")
+    seeded: bool = Field(
+        default=False,
+        description="True if this is a seeded demo book that cannot be deleted.",
+    )
 
 
 class BookCreate(BookBase):

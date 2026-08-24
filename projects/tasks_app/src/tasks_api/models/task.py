@@ -17,6 +17,7 @@ class Task(Base):
     description: Mapped[str | None] = mapped_column(String(255), index=True)
     priority: Mapped[int | None] = mapped_column(Integer, index=True)
     completed: Mapped[bool] = mapped_column(Boolean, default=False)
+    seeded: Mapped[bool] = mapped_column(Boolean, default=False)
     owner_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="CASCADE")
     )

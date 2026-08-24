@@ -1,3 +1,4 @@
+import copy
 import os
 
 from fastapi import FastAPI, HTTPException, status
@@ -21,6 +22,16 @@ from .query_aliases import (
     RatingQuery,
     TitleQuery,
 )
+
+# Snapshot of the original seeded books so we can restore them on reset.
+SEEDED_BOOKS = [copy.deepcopy(b) for b in BOOKS.values()]
+SEEDED_IDS = set(BOOKS.keys())
+
+
+def _with_seeded(book: Book) -> Book:
+    """Return a copy of the book with its `seeded` flag set for the UI."""
+    return Book.model_validate({**book.model_dump(), "seeded": book.id in SEEDED_IDS})
+
 
 app = FastAPI(
     title="Books API",
@@ -103,7 +114,7 @@ def read_all_books(
             detail="No books found matching the given criteria.",
         )
 
-    return filtered
+    return [_with_seeded(b) for b in filtered]
 
 
 @app.get("/books/{book_id}")
@@ -126,7 +137,7 @@ def read_book_by_id(
             status_code=404,
             detail=f"Book with ID {book_id} not found.",
         )
-    return book
+    return _with_seeded(book)
 
 
 @app.get("/books/categories/{category}")
@@ -146,7 +157,7 @@ def read_books_by_category(
             status_code=404,
             detail=f"No books found in category: {category}",
         )
-    return filtered
+    return [_with_seeded(b) for b in filtered]
 
 
 # read_books_by_author
@@ -167,7 +178,7 @@ def read_books_by_author(
             status_code=404,
             detail=f"No books found in author: {author}",
         )
-    return filtered
+    return [_with_seeded(b) for b in filtered]
 
 
 # get book by title
@@ -186,7 +197,7 @@ def read_books_by_title(
             status_code=404,
             detail=f"No books found in title: {title}",
         )
-    return filtered
+    return [_with_seeded(b) for b in filtered]
 
 
 # Pydantic definitions
@@ -263,7 +274,7 @@ def update_book_by_id(
         setattr(book, field, value)
         # if returning updated item, status code should be 200, easy to debug, payload
         # if returning null, status code should be 204, hard to debug, big payload
-    return book
+    return _with_seeded(book)
 
 
 ## Delete Request
@@ -283,3 +294,17 @@ def delete_book_by_id(
         )
     BOOKS.pop(book_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+## Reset Request
+@app.post("/books/reset", status_code=status.HTTP_200_OK)
+def reset_books() -> dict:
+    """
+    Restore the seeded books, discarding any user-created books.
+
+    Books are held in memory, so this returns the demo to its original state.
+    """
+    BOOKS.clear()
+    for book in copy.deepcopy(SEEDED_BOOKS):
+        BOOKS[book.id] = book
+    return {"status": "reset", "count": len(BOOKS)}

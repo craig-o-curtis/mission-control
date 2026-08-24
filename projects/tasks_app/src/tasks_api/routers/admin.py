@@ -10,6 +10,7 @@ from tasks_api.schemas.tasks import (
     ReadTaskRequest,
     UpdateTaskRequest,
 )
+from tasks_api.seed_data import SEEDED_TASKS
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -124,3 +125,18 @@ def admin_delete_task(
         )
     db.delete(task_model)
     db.commit()
+
+
+@router.post("/tasks/reset", status_code=status.HTTP_200_OK)
+def admin_reset_tasks(
+    user: UserDep,
+    db: DbDep,
+) -> dict:
+    """Reset all tasks to the original seeded state (admin only)."""
+    _require_admin(user)
+    deleted = db.query(Task).delete()
+    db.commit()
+    for spec in SEEDED_TASKS:
+        db.add(Task(owner_id=user.id, seeded=True, **spec))
+    db.commit()
+    return {"deleted": deleted, "seeded": len(SEEDED_TASKS)}

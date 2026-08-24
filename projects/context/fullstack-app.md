@@ -166,10 +166,11 @@ The tasks app needs an admin user before login works. Render's **free tier has n
 web shell** (the Shell tab is behind the paid Starter plan), so we seed automatically
 instead of running `scripts/seed.py` by hand.
 
-- `tasks_api` now calls `ensure_admin()` in its **lifespan** on every startup
-  (`src/tasks_api/bootstrap.py`). It reads `ADMIN_USER` / `ADMIN_PASSWORD` (and the
-  other `ADMIN_*` vars) and creates the admin user **only if it doesn't already exist**.
-  This runs on each deploy, so the demo always has a login — no Shell needed.
+- `tasks_api` now calls `ensure_seed_data()` in its **lifespan** on every startup
+  (`src/tasks_api/bootstrap.py`). It reads the `ADMIN_*` vars and creates the admin
+  user **and** the 3 seeded demo tasks **only if they don't already exist**. This runs
+  on each deploy, so the demo always has a login and an original task list — no Shell
+  needed. The same `seeded` flag is what protects seeded tasks from deletion.
 - `scripts/seed.py` is still available for **local** use (or if you later upgrade to a
   paid instance and want to run it from the Shell). To seed locally against the Render
   Postgres, run it with `DATABASE_URL` set to the External URL and the same `ADMIN_*` vars.
@@ -211,16 +212,19 @@ respond, and `POST /auth/token` returns a token with the demo credentials.
   `CORS_ORIGINS`.
 - **Done when:** a browser on `*.github.io` can `fetch` both APIs without a CORS error.
 
-## Phase 2 — Reset endpoints + protect seeded items
+## Phase 2 — Reset endpoints (seeded items are deletable)
 
-- books: snapshot seeded books at import; block deleting seeded ids (403);
+- books: snapshot seeded books at import; **deleting is allowed** (no 403);
   add `POST /books/reset` that restores the snapshot.
-- tasks: add `seeded` boolean column (Alembic migration); block deleting seeded
-  tasks (403) in `routers/tasks.py` + `routers/admin.py`; add
-  `POST /admin/tasks/reset` (admin only) that deletes non-seeded tasks and
-  re-inserts seeded ones (define `SEEDED_TASKS` in a new `seed_data.py`).
-- **Done when:** `/books/reset` and `/admin/tasks/reset` restore seeded data;
-  deleting a seeded item returns 403.
+- tasks: add `seeded` boolean column (Alembic migration); **deleting seeded tasks
+  is allowed** in `routers/tasks.py` + `routers/admin.py`; add
+  `POST /admin/tasks/reset` (admin only) that wipes tasks and re-inserts the
+  seeded ones (define `SEEDED_TASKS` in a new `seed_data.py`).
+- Rationale: the **Reset** button is enough to restore the original demo state, so
+  we don't block deletes. The `seeded` flag is kept only so the UI can badge demo
+  rows and so reset knows what to re-create.
+- **Done when:** `/books/reset` and `/admin/tasks/reset` restore seeded data; any
+  item (seeded or not) can be deleted.
 
 ## Phase 3 — Frontend scaffold (`projects/gui`)
 
@@ -236,7 +240,12 @@ respond, and `POST /auth/token` returns a token with the demo credentials.
 - `src/lib/api.ts`: fetch helpers (books CRUD; tasks login/CRUD with Bearer).
 - Routes: `/` (two cards), `/books` (list + create + Reset), `/tasks`
   (login → list + create/update/delete + Reset; show demo creds).
-- **Done when:** local GUI talks to local (or Render) backends end-to-end.
+- **Seeded indicators:** both `GET /books` and `GET /tasks` return a `seeded`
+  boolean on each item. The UI may render a **"demo" badge** for `seeded: true`
+  rows, but deletion stays **enabled** (the Reset button restores the original
+  seed). No lock icon / disabled delete button.
+- **Done when:** local GUI talks to local (or Render) backends end-to-end; seeded
+  rows show a "demo" badge and the Reset button restores them.
 
 ## Phase 5 — Render tuning / fallback
 
@@ -287,3 +296,11 @@ Database URL is `postgresql://…`, and SQLAlchemy defaults `postgresql://` to t
   (and `postgres://` → `postgresql+psycopg://`). Commit & push that change, then the
   plain Internal URL works. The rewrite only triggers on `postgresql://`, so a
   `+psycopg` URL passes through unchanged — the two approaches are compatible.
+
+## Deployment gotcha — health-check pings on Free tier
+Render polls the **Health Check Path** every few seconds to monitor the service. This
+is free and not an error, but it keeps the Free-tier instance **awake** (never sleeps),
+so it burns free hours 24/7 and fills the logs. If you don't need constant monitoring
+(fine for a demo), clear the **Health Check Path** (leave empty) on both services — the
+instance will then sleep after ~15 min idle. Trade-off: first request after a sleep is
+slow (cold start), and Render won't auto-detect an unhealthy state.
