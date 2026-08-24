@@ -1,94 +1,111 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
-# Pydantic models
+MissionPhase = Literal["planning", "launch", "active", "complete", "archived"]
+
+MISSION_TYPES = ["orbital", "eva", "deep_space", "surface"]
 
 
 class BookBase(BaseModel):
-    # No custom __init__ needed — Pydantic handles initialization, validation,
-    # and serialization automatically. Fields are populated from keyword arguments
-    # and validated against their type annotations and Field() constraints.
-    """Shared fields for all book models."""
+    """Shared fields for all mission models."""
 
-    title: str = Field(
+    mission_name: str = Field(
         min_length=2,
         max_length=100,
-        description="The title of the book.",
-        examples=["Amazing Book Title"],
+        description="The name of the mission.",
+        examples=["Artemis Lunar Landing"],
     )
-    author: str = Field(
+    commander: str = Field(
         min_length=2,
         max_length=100,
-        description="The author of the book.",
-        examples=["John Doe"],
+        description="The mission commander.",
+        examples=["Lovell"],
     )
-    category: str = Field(
+    mission_type: str = Field(
         min_length=2,
         max_length=50,
-        description="The category or genre of the book.",
-        examples=["Fiction"],
+        description="The type of mission (orbital, eva, deep_space, surface).",
+        examples=["surface"],
     )
     description: str | None = Field(
         default=None,
         min_length=2,
         max_length=100,
-        description="The description of the book.",
-        examples=["A book about amazing things."],
+        description="The description of the mission.",
+        examples=["A crewed lunar landing attempt."],
     )
-    rating: int | None = Field(
+    phase: MissionPhase | None = Field(
+        default=None,
+        description="The mission phase (planning/launch/active/complete/archived).",
+        examples=["active"],
+    )
+    priority: int | None = Field(
         default=None,
         ge=1,
-        le=5,
-        description="The rating of the book.",
-        examples=[3],
+        le=4,
+        description="The mission priority, P0-P3 (1-4).",
+        examples=[1],
+    )
+    launch_date: str | None = Field(
+        default=None,
+        description="Optional launch date string.",
+        examples=["2026-09-01"],
     )
 
 
 class Book(BookBase):
-    """A book with an ID."""
+    """A mission with an ID."""
 
-    id: int = Field(ge=1, description="The unique identifier of the book.")
+    id: int = Field(ge=1, description="The unique identifier of the mission.")
     seeded: bool = Field(
         default=False,
-        description="True if this is a seeded demo book that cannot be deleted.",
+        description="True if this is a seeded demo mission that cannot be deleted.",
     )
 
 
 class BookCreate(BookBase):
-    """Created book, same as BookBase with enforced required fields"""
-
-    pass
+    """Created mission, same as BookBase with enforced required fields."""
 
 
 class BookUpdate(BookBase):
-    "PUT Book, all fields optional"
+    """PUT mission, all fields optional."""
 
-    title: str | None = Field(
+    mission_name: str | None = Field(
         default=None,
         min_length=2,
         max_length=100,
-        description="Updated title of the book.",
+        description="Updated mission name.",
     )
-    author: str | None = Field(
+    commander: str | None = Field(
         default=None,
         min_length=2,
         max_length=100,
-        description="Updated author of the book.",
+        description="Updated commander.",
     )
-    category: str | None = Field(
+    mission_type: str | None = Field(
         default=None,
         min_length=2,
         max_length=50,
-        description="Updated category or genre of the book.",
+        description="Updated mission type.",
     )
     description: str | None = Field(
         default=None,
         min_length=2,
         max_length=100,
-        description="Updated description of the book.",
+        description="Updated description.",
     )
-    rating: int | None = Field(
+    phase: MissionPhase | None = Field(
+        default=None,
+        description="Updated phase.",
+    )
+    priority: int | None = Field(
         default=None,
         ge=1,
-        le=5,
-        description="Updated rating of the book.",
+        le=4,
+        description="Updated priority.",
+    )
+    launch_date: str | None = Field(
+        default=None,
+        description="Updated launch date string.",
     )

@@ -16,26 +16,26 @@ from .path_aliases import (
     TitlePath,
 )
 from .query_aliases import (
-    AuthorQuery,
-    CategoryQuery,
+    CommanderQuery,
     DescriptionQuery,
-    RatingQuery,
-    TitleQuery,
+    MissionNameQuery,
+    MissionTypeQuery,
+    PhaseQuery,
 )
 
-# Snapshot of the original seeded books so we can restore them on reset.
+# Snapshot of the original seeded missions so we can restore them on reset.
 SEEDED_BOOKS = [copy.deepcopy(b) for b in BOOKS.values()]
 SEEDED_IDS = set(BOOKS.keys())
 
 
 def _with_seeded(book: Book) -> Book:
-    """Return a copy of the book with its `seeded` flag set for the UI."""
+    """Return a copy of the mission with its `seeded` flag set for the UI."""
     return Book.model_validate({**book.model_dump(), "seeded": book.id in SEEDED_IDS})
 
 
 app = FastAPI(
     title="Books API",
-    description="A simple API to manage a collection of books.",
+    description="A simple API to manage a collection of missions.",
     version="1.0.0",
 )
 
@@ -76,42 +76,49 @@ def root() -> dict[str, str]:
 
 @app.get("/books")
 def read_all_books(
-    category: CategoryQuery = None,
-    author: AuthorQuery = None,
-    title: TitleQuery = None,
+    mission_type: MissionTypeQuery = None,
+    commander: CommanderQuery = None,
+    mission_name: MissionNameQuery = None,
     description: DescriptionQuery = None,
-    rating: RatingQuery = None,
+    phase: PhaseQuery = None,
 ) -> list[Book]:
     """
-    Retrieve all books.
+    Retrieve all missions.
 
-    Optionally allow filtering by category, author, or title via query params
+    Optionally filter by mission_type, commander, or mission_name (query params).
     """
     filtered = list(BOOKS.values())
 
-    if category is not None:
+    if mission_type is not None:
         filtered = [
-            book for book in filtered if is_casefold_match(book.category, category)
+            book
+            for book in filtered
+            if is_casefold_match(book.mission_type, mission_type)
         ]
-    if author is not None:
-        filtered = [book for book in filtered if is_casefold_match(book.author, author)]
-    if title is not None:
-        filtered = [book for book in filtered if is_casefold_match(book.title, title)]
+    if commander is not None:
+        filtered = [
+            book for book in filtered if is_casefold_match(book.commander, commander)
+        ]
+    if mission_name is not None:
+        filtered = [
+            book
+            for book in filtered
+            if is_casefold_match(book.mission_name, mission_name)
+        ]
     if description is not None:
         filtered = [
             book
             for book in filtered
-            # need to check first if description is not None
             if book.description is not None
             and is_casefold_match(book.description, description)
         ]
-    if rating is not None:
-        filtered = [book for book in filtered if book.rating == rating]
+    if phase is not None:
+        filtered = [book for book in filtered if book.phase == phase]
 
     if not filtered:
         raise HTTPException(
             status_code=404,
-            detail="No books found matching the given criteria.",
+            detail="No missions found matching the given criteria.",
         )
 
     return [_with_seeded(b) for b in filtered]
@@ -122,20 +129,20 @@ def read_book_by_id(
     book_id: BookIdPath,
 ) -> Book:
     """
-    Fetch a single book by its ID.
+    Fetch a single mission by its ID.
 
     The ID must be a positive integer.
     """
     if not is_positive_integer(book_id):
         raise HTTPException(
             status_code=422,
-            detail=f"Book ID must be a positive integer. Received: {book_id}",
+            detail=f"Mission ID must be a positive integer. Received: {book_id}",
         )
     book = BOOKS.get(book_id)
     if book is None:
         raise HTTPException(
             status_code=404,
-            detail=f"Book with ID {book_id} not found.",
+            detail=f"Mission with ID {book_id} not found.",
         )
     return _with_seeded(book)
 
@@ -145,62 +152,61 @@ def read_books_by_category(
     category: CategoryPath,
 ) -> list[Book]:
     """
-    Fetch all books in a given category.
+    Fetch all missions of a given mission type.
 
-    The category name is case-sensitive.
+    The mission type is case-insensitive.
     """
     filtered = [
-        book for book in BOOKS.values() if is_casefold_match(book.category, category)
+        book
+        for book in BOOKS.values()
+        if is_casefold_match(book.mission_type, category)
     ]
     if not filtered:
         raise HTTPException(
             status_code=404,
-            detail=f"No books found in category: {category}",
+            detail=f"No missions found for type: {category}",
         )
     return [_with_seeded(b) for b in filtered]
 
 
-# read_books_by_author
 @app.get("/books/authors/{author}")
 def read_books_by_author(
     author: AuthorPath,
 ) -> list[Book]:
     """
-    Fetch all books in a given author.
+    Fetch all missions for a given commander.
 
-    The author name is case-sensitive.
+    The commander name is case-insensitive.
     """
     filtered = [
-        book for book in BOOKS.values() if is_casefold_match(book.author, author)
+        book for book in BOOKS.values() if is_casefold_match(book.commander, author)
     ]
     if not filtered:
         raise HTTPException(
             status_code=404,
-            detail=f"No books found in author: {author}",
+            detail=f"No missions found for commander: {author}",
         )
     return [_with_seeded(b) for b in filtered]
 
 
-# get book by title
 @app.get("/books/titles/{title}")
 def read_books_by_title(
     title: TitlePath,
 ) -> list[Book]:
     """
-    Fetch all books in a given title.
+    Fetch all missions with a given name.
 
-    The title name is case-sensitive.
+    The mission name is case-insensitive.
     """
-    filtered = [book for book in BOOKS.values() if is_casefold_match(book.title, title)]
+    filtered = [
+        book for book in BOOKS.values() if is_casefold_match(book.mission_name, title)
+    ]
     if not filtered:
         raise HTTPException(
             status_code=404,
-            detail=f"No books found in title: {title}",
+            detail=f"No missions found with name: {title}",
         )
     return [_with_seeded(b) for b in filtered]
-
-
-# Pydantic definitions
 
 
 ## Create Endpoint
@@ -209,32 +215,26 @@ def read_books_by_title(
 @app.post("/books", status_code=status.HTTP_201_CREATED)
 def create_book(new_book: BookCreateBody) -> Book:
     """
-    Create a new book.
+    Create a new mission.
 
-    The book must have a unique ID.
+    The mission must have a unique ID.
     """
-    # Ensure this is not a repeat - check all key vals to see not a duplicate
+    # Ensure this is not a repeat - check key vals to see not a duplicate
     if any(
-        is_casefold_match(book.title, new_book.title)
-        and is_casefold_match(book.author, new_book.author)
-        and is_casefold_match(book.category, new_book.category)
+        is_casefold_match(book.mission_name, new_book.mission_name)
+        and is_casefold_match(book.commander, new_book.commander)
+        and is_casefold_match(book.mission_type, new_book.mission_type)
         for book in BOOKS.values()
     ):
         raise HTTPException(
             status_code=409,
-            detail=f"Book {new_book.title} by {new_book.author} already exists.",
+            detail=f"Mission {new_book.mission_name} commanded by "
+            f"{new_book.commander} already exists.",
         )
-    # Create a new book with a unique ID
+    # Create a new mission with a unique ID
     new_book_id = max(BOOKS.keys()) + 1
     book = Book(
         id=new_book_id,
-        # title=new_book.title,
-        # author=new_book.author,
-        # category=new_book.category,
-        # description=new_book.description,
-        # rating=new_book.rating,
-        # **new_book.dict(), was changed to .model_dump() in version ...
-        # Or spread with a copy, model_dump() copies the model into a dict
         **new_book.model_dump(),
     )
     BOOKS[new_book_id] = book
@@ -250,30 +250,24 @@ def update_book_by_id(
     book_update: BookUpdateBody,
 ) -> Book:
     """
-    Update a book by ID.
+    Update a mission by ID.
 
-    The book ID must exist.
+    The mission ID must exist.
     """
     if book_id not in BOOKS:
         raise HTTPException(
             status_code=404,
-            detail=f"Book ID {book_id} not found.",
+            detail=f"Mission ID {book_id} not found.",
         )
-    # The targeted book, op below mutates/updates
+    # The targeted mission, op below mutates/updates
     book = BOOKS[book_id]
-    # model_dump in pydantic serializes model instance into dict
-    # it is replacement for the old .dict()
+    # model_dump in pydantic serializes model instance into dict.
     # exclude_unset=True means that if a field is not set in the request body,
-    # it will not be updated - i.e. if an undefined is passed from the FE
-    # FE passing `null` will be properly converted to None
+    # it will not be updated - i.e. if an undefined is passed from the FE.
+    # FE passing `null` will be properly converted to None.
     update_data = book_update.model_dump(exclude_unset=True)
-    # The .items() method returns a view object that displays a list
-    # of a given dictionary's key-value tuple pair.
     for field, value in update_data.items():
-        # if value is not None: # enabling this prevents nulling out values
         setattr(book, field, value)
-        # if returning updated item, status code should be 200, easy to debug, payload
-        # if returning null, status code should be 204, hard to debug, big payload
     return _with_seeded(book)
 
 
@@ -283,14 +277,14 @@ def delete_book_by_id(
     book_id: BookIdPath,
 ) -> Response:
     """
-    Delete a book by ID.
+    Delete a mission by ID.
 
-    The book ID must exist.
+    The mission ID must exist.
     """
     if book_id not in BOOKS:
         raise HTTPException(
             status_code=404,
-            detail=f"Book ID {book_id} not found.",
+            detail=f"Mission ID {book_id} not found.",
         )
     BOOKS.pop(book_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -300,9 +294,9 @@ def delete_book_by_id(
 @app.post("/books/reset", status_code=status.HTTP_200_OK)
 def reset_books() -> dict:
     """
-    Restore the seeded books, discarding any user-created books.
+    Restore the seeded missions, discarding any user-created missions.
 
-    Books are held in memory, so this returns the demo to its original state.
+    Missions are held in memory, so this returns the demo to its original state.
     """
     BOOKS.clear()
     for book in copy.deepcopy(SEEDED_BOOKS):

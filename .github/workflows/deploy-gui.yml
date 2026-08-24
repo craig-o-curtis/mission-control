@@ -1,0 +1,52 @@
+name: Deploy GUI to GitHub Pages
+
+# Build the SvelteKit SPA and publish it to the `gh-pages` branch.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# peaceiris/actions-gh-pages pushes to the gh-pages branch.
+permissions:
+  contents: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: projects/gui
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: pnpm
+          cache-dependency-path: projects/gui/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build (base path + backend URLs)
+        run: pnpm run build
+        env:
+          # Base path for the GitHub Pages project site.
+          BASE_PATH: /fastapi-endpoints
+          # Render URLs for the two backends (repo Secrets).
+          PUBLIC_BOOKS_API: ${{ secrets.BOOKS_API_URL }}
+          PUBLIC_TASKS_API: ${{ secrets.TASKS_API_URL }}
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: projects/gui/build
+          publish_branch: gh-pages
+          user_name: github-actions[bot]
+          user_email: github-actions[bot]@users.noreply.github.com

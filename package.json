@@ -1,0 +1,20 @@
+{
+	"name": "fastapi-backend",
+	"private": true,
+	"version": "0.0.0",
+	"type": "module",
+	"engines": {
+		"node": ">=24"
+	},
+	"packageManager": "pnpm@10.33.2",
+	"scripts": {
+		"dev": "pnpm -C projects/gui run dev",
+		"build": "pnpm -C projects/gui run build",
+		"preview": "pnpm -C projects/gui run preview",
+		"check": "pnpm -C projects/gui run check",
+		"lint": "pnpm -C projects/gui run lint",
+		"format": "pnpm -C projects/gui run format",
+		"format:check": "pnpm -C projects/gui run format:check",
+		"test": "pnpm -C projects/gui run test"
+	}
+}

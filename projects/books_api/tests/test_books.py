@@ -12,7 +12,7 @@ ORIGINAL_BOOKS = copy.deepcopy(BOOKS)
 
 @pytest.fixture
 def api_client(monkeypatch):
-    # Ensure each test starts with a fresh copy of the original books
+    # Ensure each test starts with a fresh copy of the original missions
     books = copy.deepcopy(ORIGINAL_BOOKS)
     monkeypatch.setattr(books_module, "BOOKS", books)
     return TestClient(app)
@@ -30,82 +30,75 @@ class TestRoot:
 
 class TestReadBooks:
     def test_read_all_books(self, api_client: TestClient) -> None:
-        """Verify GET /books returns all books with a 200 status."""
+        """Verify GET /books returns all missions with a 200 status."""
         response = api_client.get("/books")
         assert response.status_code == 200
         books = response.json()
         assert len(books) == 6
 
-    def test_filter_By_query_Params(self, api_client: TestClient) -> None:
-        """Verify filtering by query params returns the correct books."""
-        # Test category
-        response = api_client.get("/books?category=science")
+    def test_filter_by_query_params(self, api_client: TestClient) -> None:
+        """Verify filtering by query params returns the correct missions."""
+        # Test mission_type
+        response = api_client.get("/books?mission_type=surface")
         assert response.status_code == 200
-        books = response.json()
-        assert len(books) == 2
-        # Test author
-        response = api_client.get("/books?author=Author One")
+        assert len(response.json()) == 3
+        # Test commander
+        response = api_client.get("/books?commander=Lovell")
         assert response.status_code == 200
-        books = response.json()
-        assert len(books) == 1
-        # Test title
-        response = api_client.get("/books?title=Title One")
+        assert len(response.json()) == 2
+        # Test mission_name
+        response = api_client.get("/books?mission_name=Artemis Lunar Landing")
         assert response.status_code == 200
-        books = response.json()
-        assert len(books) == 1
-        # Test Description
-        response = api_client.get("/books?description=A book about biology")
+        assert len(response.json()) == 1
+        # Test description
+        response = api_client.get("/books?description=Crewed lunar landing attempt.")
         assert response.status_code == 200
-        books = response.json()
-        assert len(books) == 1
-        # Test Rating
-        response = api_client.get("/books?rating=5")
-        assert response.status_code == 200
-        books = response.json()
-        assert len(books) == 1
-
-    def test_combined_query_filters(self, api_client: TestClient) -> None:
-        """Verify combining multiple query filters works correctly."""
-        # Test one that exists
-        response = api_client.get("/books?category=science&rating=5")
-        assert response.status_code == 200
-        books = response.json()
-        assert len(books) == 1
-        # Test one that doesn't exist
-        response = api_client.get("/books?category=science&rating=1")
-        assert response.status_code == 404
-
-    def test_filter_by_category_case_insensitive(self, api_client: TestClient) -> None:
-        """Verify category filtering is case-insensitive."""
-        response = api_client.get("/books/categories/science")
-        assert response.status_code == 200
-        books = response.json()
-        assert len(books) == 2
-        assert all(b["category"] == "science" for b in books)
-
-        response = api_client.get("/books/categories/SCIENCE")
+        assert len(response.json()) == 1
+        # Test phase
+        response = api_client.get("/books?phase=active")
         assert response.status_code == 200
         assert len(response.json()) == 2
 
-    def test_filter_by_author_case_insensitive(self, api_client: TestClient) -> None:
-        """Verify author filtering is case-insensitive."""
-        response = api_client.get("/books/authors/Author%20One")
-        assert response.status_code == 200
-        books = response.json()
-        assert len(books) == 1
-        assert books[0]["author"] == "Author One"
-
-        response = api_client.get("/books/authors/author%20one")
+    def test_combined_query_filters(self, api_client: TestClient) -> None:
+        """Verify combining multiple query filters works correctly."""
+        response = api_client.get("/books?mission_type=surface&phase=active")
         assert response.status_code == 200
         assert len(response.json()) == 1
+        # Test one that doesn't exist
+        response = api_client.get("/books?mission_type=surface&phase=planning")
+        assert response.status_code == 404
+
+    def test_filter_by_category_case_insensitive(self, api_client: TestClient) -> None:
+        """Verify mission_type filtering is case-insensitive."""
+        response = api_client.get("/books/categories/surface")
+        assert response.status_code == 200
+        books = response.json()
+        assert len(books) == 3
+        assert all(b["mission_type"] == "surface" for b in books)
+
+        response = api_client.get("/books/categories/SURFACE")
+        assert response.status_code == 200
+        assert len(response.json()) == 3
+
+    def test_filter_by_author_case_insensitive(self, api_client: TestClient) -> None:
+        """Verify commander filtering is case-insensitive."""
+        response = api_client.get("/books/authors/Lovell")
+        assert response.status_code == 200
+        books = response.json()
+        assert len(books) == 2
+        assert books[0]["commander"] == "Lovell"
+
+        response = api_client.get("/books/authors/lovell")
+        assert response.status_code == 200
+        assert len(response.json()) == 2
 
     def test_filter_by_title_case_insensitive(self, api_client: TestClient) -> None:
-        """Verify title filtering is case-insensitive."""
-        response = api_client.get("/books/titles/Title%20One")
+        """Verify mission_name filtering is case-insensitive."""
+        response = api_client.get("/books/titles/Artemis Lunar Landing")
         assert response.status_code == 200
         books = response.json()
         assert len(books) == 1
-        assert books[0]["title"] == "Title One"
+        assert books[0]["mission_name"] == "Artemis Lunar Landing"
 
     def test_filter_no_results(self, api_client: TestClient) -> None:
         """Verify filtering with no matching results returns 404."""
@@ -114,175 +107,190 @@ class TestReadBooks:
 
     def test_query_filter_no_results(self, api_client: TestClient) -> None:
         """Verify query param filtering with no results returns 404."""
-        response = api_client.get("/books?category=fantasy")
+        response = api_client.get("/books?mission_type=fantasy")
         assert response.status_code == 404
 
 
 class TestReadBook:
     def test_read_book_by_id_found(self, api_client: TestClient) -> None:
-        """Verify GET /books/{id} returns the matching book when it exists."""
+        """Verify GET /books/{id} returns the matching mission when it exists."""
         response = api_client.get("/books/1")
         assert response.status_code == 200
         book = response.json()
-        assert book["title"] == "Title One"
+        assert book["mission_name"] == "Artemis Lunar Landing"
 
     def test_read_book_by_id_not_found(self, api_client: TestClient) -> None:
-        """Verify GET /books/{id} returns 404 when the book does not exist."""
+        """Verify GET /books/{id} returns 404 when the mission does not exist."""
         response = api_client.get("/books/999")
         assert response.status_code == 404
 
     def test_read_book_by_id_non_integer(self, api_client: TestClient) -> None:
-        """Verify non-integer book ID returns 422."""
+        """Verify non-integer mission ID returns 422."""
         response = api_client.get("/books/abc")
-        # Code 422 is for unprocessable entity.
         assert response.status_code == 422
 
     def test_read_book_by_id_negative(self, api_client: TestClient) -> None:
-        """Verify negative book ID returns 422."""
+        """Verify negative mission ID returns 422."""
         response = api_client.get("/books/-1")
         assert response.status_code == 422
 
 
 class TestCreateBook:
     def test_happy_path(self, api_client: TestClient) -> None:
-        """Verify creating a book returns the created book with all fields."""
+        """Verify creating a mission returns the created mission with all fields."""
         response = api_client.post(
             "/books",
-            json={"title": "New Book", "author": "New Author", "category": "fiction"},
+            json={
+                "mission_name": "New Mission",
+                "commander": "New Commander",
+                "mission_type": "orbital",
+            },
         )
         assert response.status_code == 201
         book = response.json()
-        assert book["title"] == "New Book"
-        assert book["author"] == "New Author"
-        assert book["category"] == "fiction"
+        assert book["mission_name"] == "New Mission"
+        assert book["commander"] == "New Commander"
+        assert book["mission_type"] == "orbital"
         assert book["id"] == 7
 
     def test_create_book_with_all_fields(self, api_client: TestClient) -> None:
-        """Verify creating a book with all fields returns the created book."""
+        """Verify creating a mission with all fields returns the created mission."""
         response = api_client.post(
             "/books",
             json={
-                "title": "New Book",
-                "author": "New Author",
-                "category": "fiction",
-                "description": "A new book",
-                "rating": 5,
+                "mission_name": "New Mission",
+                "commander": "New Commander",
+                "mission_type": "orbital",
+                "description": "A new mission",
+                "phase": "planning",
+                "priority": 2,
+                "launch_date": "2026-10-01",
             },
         )
         assert response.status_code == 201
         book = response.json()
-        assert book["title"] == "New Book"
-        assert book["author"] == "New Author"
-        assert book["category"] == "fiction"
-        assert book["description"] == "A new book"
-        assert book["rating"] == 5
+        assert book["mission_name"] == "New Mission"
+        assert book["commander"] == "New Commander"
+        assert book["mission_type"] == "orbital"
+        assert book["description"] == "A new mission"
+        assert book["phase"] == "planning"
+        assert book["priority"] == 2
+        assert book["launch_date"] == "2026-10-01"
 
-    def test_create_title_too_short(self, api_client: TestClient) -> None:
-        """Verify creating a book with a title too short returns 422."""
-        response = api_client.post(
-            "/books",
-            json={"title": "A", "author": "New Author", "category": "fiction"},
-        )
-        assert response.status_code == 422
-
-    def test_create_title_too_long(self, api_client: TestClient) -> None:
-        """Verify creating a book with a title too long returns 422."""
+    def test_create_mission_name_too_short(self, api_client: TestClient) -> None:
+        """Verify creating a mission with a mission_name too short returns 422."""
         response = api_client.post(
             "/books",
             json={
-                "title": "A" * 101,
-                "author": "New Author",
-                "category": "fiction",
+                "mission_name": "A",
+                "commander": "New Commander",
+                "mission_type": "orbital",
             },
         )
         assert response.status_code == 422
 
-    def test_create_author_too_short(self, api_client: TestClient) -> None:
-        """Verify creating a book with an author too short returns 422."""
-        response = api_client.post(
-            "/books",
-            json={"title": "New Book", "author": "A", "category": "fiction"},
-        )
-        assert response.status_code == 422
-
-    def test_create_author_too_long(self, api_client: TestClient) -> None:
-        """Verify creating a book with an author too long returns 422."""
+    def test_create_mission_name_too_long(self, api_client: TestClient) -> None:
+        """Verify creating a mission with a mission_name too long returns 422."""
         response = api_client.post(
             "/books",
             json={
-                "title": "New Book",
-                "author": "A" * 101,
-                "category": "fiction",
+                "mission_name": "A" * 101,
+                "commander": "New Commander",
+                "mission_type": "orbital",
+            },
+        )
+        assert response.status_code == 422
+
+    def test_create_commander_too_short(self, api_client: TestClient) -> None:
+        """Verify creating a mission with a commander too short returns 422."""
+        response = api_client.post(
+            "/books",
+            json={
+                "mission_name": "New Mission",
+                "commander": "A",
+                "mission_type": "orbital",
+            },
+        )
+        assert response.status_code == 422
+
+    def test_create_commander_too_long(self, api_client: TestClient) -> None:
+        """Verify creating a mission with a commander too long returns 422."""
+        response = api_client.post(
+            "/books",
+            json={
+                "mission_name": "New Mission",
+                "commander": "A" * 101,
+                "mission_type": "orbital",
             },
         )
         assert response.status_code == 422
 
     def test_create_description_too_short(self, api_client: TestClient) -> None:
-        """Verify creating a book with a description too short returns 422."""
+        """Verify creating a mission with a description too short returns 422."""
         response = api_client.post(
             "/books",
             json={
-                "title": "New Book",
-                "author": "New Author",
-                "category": "fiction",
+                "mission_name": "New Mission",
+                "commander": "New Commander",
+                "mission_type": "orbital",
                 "description": "A",
             },
         )
         assert response.status_code == 422
 
     def test_create_description_too_long(self, api_client: TestClient) -> None:
-        """Verify creating a book with a description too long returns 422."""
+        """Verify creating a mission with a description too long returns 422."""
         response = api_client.post(
             "/books",
             json={
-                "title": "New Book",
-                "author": "New Author",
-                "category": "fiction",
+                "mission_name": "New Mission",
+                "commander": "New Commander",
+                "mission_type": "orbital",
                 "description": "A" * 1001,
             },
         )
         assert response.status_code == 422
 
-    def test_duplicate_book_returns_409(self, api_client: TestClient) -> None:
-        """Verify creating a duplicate book returns 409."""
+    def test_duplicate_mission_returns_409(self, api_client: TestClient) -> None:
+        """Verify creating a duplicate mission returns 409."""
         response = api_client.post(
             "/books",
-            json={"title": "Title One", "author": "Author One", "category": "science"},
+            json={
+                "mission_name": "Artemis Lunar Landing",
+                "commander": "Lovell",
+                "mission_type": "surface",
+            },
         )
         assert response.status_code == 409
 
     def test_create_missing_required_fields_422(self, api_client: TestClient) -> None:
-        """Verify creating a book without a title returns 422."""
-        # Error Code 422 sent when the request is well-formed but the data is invalid.
-        # Missing title
+        """Verify creating a mission without required fields returns 422."""
+        # Missing mission_name
         response = api_client.post(
-            "/books",
-            json={"author": "New Author", "category": "fiction"},
+            "/books", json={"commander": "New Commander", "mission_type": "orbital"}
         )
         assert response.status_code == 422
-        # Missing author
+        # Missing commander
         response = api_client.post(
-            "/books",
-            json={"title": "New Book", "category": "fiction"},
+            "/books", json={"mission_name": "New Mission", "mission_type": "orbital"}
         )
         assert response.status_code == 422
-        # Missing category
+        # Missing mission_type
         response = api_client.post(
-            "/books",
-            json={"title": "New Book", "author": "New Author"},
+            "/books", json={"mission_name": "New Mission", "commander": "New Commander"}
         )
         assert response.status_code == 422
 
-    def test_exceeds_min_max_rating_422(self, api_client: TestClient) -> None:
-        """Verify creating a book with an invalid rating returns 422."""
+    def test_exceeds_min_max_priority_422(self, api_client: TestClient) -> None:
+        """Verify creating a mission with an invalid priority returns 422."""
         # Above max
         response = api_client.post(
             "/books",
             json={
-                "title": "New Book",
-                "author": "New Author",
-                "category": "fiction",
-                "rating": 6,
+                "mission_name": "New Mission",
+                "commander": "New Commander",
+                "mission_type": "orbital",
+                "priority": 5,
             },
         )
         assert response.status_code == 422
@@ -290,40 +298,58 @@ class TestCreateBook:
         response = api_client.post(
             "/books",
             json={
-                "title": "New Book",
-                "author": "New Author",
-                "category": "fiction",
-                "rating": 0,
+                "mission_name": "New Mission",
+                "commander": "New Commander",
+                "mission_type": "orbital",
+                "priority": 0,
             },
         )
         assert response.status_code == 422
-        # Below Min, negative
+        # Below min, negative
         response = api_client.post(
             "/books",
             json={
-                "title": "New Book",
-                "author": "New Author",
-                "category": "fiction",
-                "rating": -1,
+                "mission_name": "New Mission",
+                "commander": "New Commander",
+                "mission_type": "orbital",
+                "priority": -1,
             },
-        )
-
-    def test_create_category_too_short(self, api_client: TestClient) -> None:
-        """Verify creating a book with category too short returns 422."""
-        response = api_client.post(
-            "/books",
-            json={"title": "New Book", "author": "New Author", "category": "A"},
         )
         assert response.status_code == 422
 
-    def test_create_category_too_long(self, api_client: TestClient) -> None:
-        """Verify creating a book with category too long returns 422."""
+    def test_invalid_phase_422(self, api_client: TestClient) -> None:
+        """Verify creating a mission with an invalid phase returns 422."""
         response = api_client.post(
             "/books",
             json={
-                "title": "New Book",
-                "author": "New Author",
-                "category": "A" * 51,
+                "mission_name": "New Mission",
+                "commander": "New Commander",
+                "mission_type": "orbital",
+                "phase": "blastoff",
+            },
+        )
+        assert response.status_code == 422
+
+    def test_create_mission_type_too_short(self, api_client: TestClient) -> None:
+        """Verify creating a mission with mission_type too short returns 422."""
+        response = api_client.post(
+            "/books",
+            json={
+                "mission_name": "New Mission",
+                "commander": "New Commander",
+                "mission_type": "A",
+            },
+        )
+        assert response.status_code == 422
+
+    def test_create_mission_type_too_long(self, api_client: TestClient) -> None:
+        """Verify creating a mission with mission_type too long returns 422."""
+        response = api_client.post(
+            "/books",
+            json={
+                "mission_name": "New Mission",
+                "commander": "New Commander",
+                "mission_type": "A" * 51,
             },
         )
         assert response.status_code == 422
@@ -331,45 +357,47 @@ class TestCreateBook:
 
 class TestUpdateBook:
     def test_happy_path(self, api_client: TestClient) -> None:
-        """Verify updating a book returns the updated book with all fields."""
+        """Verify updating a mission returns the updated mission with all fields."""
         response = api_client.put(
             "/books/1",
             json={
-                "title": "Updated Title",
-                "author": "Updated Author",
-                "category": "fiction",
+                "mission_name": "Updated Mission",
+                "commander": "Updated Commander",
+                "mission_type": "orbital",
             },
         )
         assert response.status_code == 200
         book = response.json()
-        assert book["title"] == "Updated Title"
-        assert book["author"] == "Updated Author"
-        assert book["category"] == "fiction"
+        assert book["mission_name"] == "Updated Mission"
+        assert book["commander"] == "Updated Commander"
+        assert book["mission_type"] == "orbital"
         assert book["id"] == 1
 
-    def test_update_nonexistent_book_returns_404(self, api_client: TestClient) -> None:
-        """Verify updating a nonexistent book returns 404."""
+    def test_update_nonexistent_mission_returns_404(
+        self, api_client: TestClient
+    ) -> None:
+        """Verify updating a nonexistent mission returns 404."""
         response = api_client.put(
             "/books/999",
             json={
-                "title": "Updated Title",
-                "author": "Updated Author",
-                "category": "fiction",
+                "mission_name": "Updated Mission",
+                "commander": "Updated Commander",
+                "mission_type": "orbital",
             },
         )
         assert response.status_code == 404
 
     def test_update_partial_fields(self, api_client: TestClient) -> None:
-        """Verify updating only title leaves other fields unchanged."""
+        """Verify updating only mission_name leaves other fields unchanged."""
         response = api_client.put(
             "/books/1",
-            json={"title": "Updated Title"},
+            json={"mission_name": "Updated Mission"},
         )
         assert response.status_code == 200
         book = response.json()
-        assert book["title"] == "Updated Title"
-        assert book["author"] == "Author One"  # unchanged
-        assert book["category"] == "science"  # unchanged
+        assert book["mission_name"] == "Updated Mission"
+        assert book["commander"] == "Lovell"  # unchanged
+        assert book["mission_type"] == "surface"  # unchanged
 
     def test_update_clear_field_with_null(self, api_client: TestClient) -> None:
         """Verify setting a field to null clears it."""
@@ -381,11 +409,11 @@ class TestUpdateBook:
         book = response.json()
         assert book["description"] is None
 
-    def test_update_invalid_rating(self, api_client: TestClient) -> None:
-        """Verify invalid rating on update returns 422."""
+    def test_update_invalid_priority(self, api_client: TestClient) -> None:
+        """Verify invalid priority on update returns 422."""
         response = api_client.put(
             "/books/1",
-            json={"rating": 10},
+            json={"priority": 10},
         )
         assert response.status_code == 422
 
@@ -393,31 +421,33 @@ class TestUpdateBook:
         """Verify invalid field length on update returns 422."""
         response = api_client.put(
             "/books/1",
-            json={"title": "A"},
+            json={"mission_name": "A"},
         )
         assert response.status_code == 422
 
 
 class TestDeleteBook:
     def test_happy_path(self, api_client: TestClient) -> None:
-        """Verify deleting a book returns the deleted book with all fields."""
+        """Verify deleting a mission returns 204."""
         response = api_client.delete("/books/1")
         assert response.status_code == 204
 
     def test_delete_already_deleted_404(self, api_client: TestClient) -> None:
-        """Verify deleting a book twice returns 422."""
+        """Verify deleting a mission twice returns 404."""
         api_client.delete("/books/1")
         response = api_client.delete("/books/1")
         assert response.status_code == 404
-        assert response.json()["detail"] == "Book ID 1 not found."
+        assert response.json()["detail"] == "Mission ID 1 not found."
 
-    def test_delete_nonexistent_book_returns_404(self, api_client: TestClient) -> None:
-        """Verify deleting a nonexistent book returns 404."""
+    def test_delete_nonexistent_mission_returns_404(
+        self, api_client: TestClient
+    ) -> None:
+        """Verify deleting a nonexistent mission returns 404."""
         response = api_client.delete("/books/999")
         assert response.status_code == 404
 
     def test_delete_then_verify_gone(self, api_client: TestClient) -> None:
-        """Verify deleted book is actually removed."""
+        """Verify deleted mission is actually removed."""
         api_client.delete("/books/1")
         response = api_client.get("/books/1")
         assert response.status_code == 404

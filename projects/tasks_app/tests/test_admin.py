@@ -49,28 +49,28 @@ class TestAdminCreateTask:
     def test_admin_creates_task(self, admin_client: TestClient) -> None:
         """Admin can create a task."""
         new_task = {
-            "title": "Admin Task",
+            "checklist_item": "Admin Task",
             "description": "Created by admin.",
-            "priority": 3,
+            "criticality": 3,
         }
         response = admin_client.post("/admin/tasks", json=new_task)
         assert response.status_code == 201
         data = response.json()
-        assert data["title"] == new_task["title"]
+        assert data["checklist_item"] == new_task["checklist_item"]
         assert data["description"] == new_task["description"]
-        assert data["priority"] == new_task["priority"]
+        assert data["criticality"] == new_task["criticality"]
 
     def test_admin_creates_task_minimal(self, admin_client: TestClient) -> None:
         """Admin can create a task with minimal fields."""
-        new_task = {"title": "Minimal Admin Task"}
+        new_task = {"checklist_item": "Minimal Admin Task"}
         response = admin_client.post("/admin/tasks", json=new_task)
         assert response.status_code == 201
         data = response.json()
-        assert data["title"] == new_task["title"]
+        assert data["checklist_item"] == new_task["checklist_item"]
 
     def test_non_admin_cannot_create_task(self, api_client: TestClient) -> None:
         """Non-admin user gets 403 on admin create task."""
-        new_task = {"title": "Unauthorized Task"}
+        new_task = {"checklist_item": "Unauthorized Task"}
         response = api_client.post("/admin/tasks", json=new_task)
         assert response.status_code == 403
 
@@ -78,23 +78,26 @@ class TestAdminCreateTask:
 class TestAdminUpdateTask:
     def test_admin_updates_task(self, admin_client: TestClient) -> None:
         """Admin can update any task."""
-        update_data = {"title": "Updated by Admin", "description": "Admin update."}
+        update_data = {
+            "checklist_item": "Updated by Admin",
+            "description": "Admin update.",
+        }
         response = admin_client.put("/admin/tasks/1", json=update_data)
         assert response.status_code == 200
         data = response.json()
-        assert data["title"] == update_data["title"]
+        assert data["checklist_item"] == update_data["checklist_item"]
         assert data["description"] == update_data["description"]
 
     def test_admin_updates_task_not_found(self, admin_client: TestClient) -> None:
         """Admin gets 404 when updating non-existent task."""
-        update_data = {"title": "Nope"}
+        update_data = {"checklist_item": "Nope"}
         response = admin_client.put("/admin/tasks/999", json=update_data)
         assert response.status_code == 404
         assert response.json()["detail"] == "Task not found"
 
     def test_non_admin_cannot_update_task(self, api_client: TestClient) -> None:
         """Non-admin user gets 403 on admin update task."""
-        update_data = {"title": "Unauthorized Update"}
+        update_data = {"checklist_item": "Unauthorized Update"}
         response = api_client.put("/admin/tasks/1", json=update_data)
         assert response.status_code == 403
 

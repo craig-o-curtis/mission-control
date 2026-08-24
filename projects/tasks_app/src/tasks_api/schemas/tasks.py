@@ -5,10 +5,12 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class ReadTaskRequest(BaseModel):
     id: int
-    title: str
+    checklist_item: str
     description: str | None
-    priority: int | None
-    completed: bool
+    criticality: int | None
+    executed: bool
+    mission_id: int | None
+    notes: str | None
     seeded: bool
 
     # This is key: tells pydantic to read from the SQLAlchemy model attributes,
@@ -17,14 +19,18 @@ class ReadTaskRequest(BaseModel):
 
 
 class CreateTaskRequest(BaseModel):
-    title: str = Field(min_length=3, max_length=100)
+    checklist_item: str = Field(min_length=3, max_length=100)
     description: str | None = Field(default=None, min_length=1, max_length=500)
-    priority: int | None = Field(default=None, gt=0, le=5)
-    completed: bool = Field(default=False)
+    criticality: int | None = Field(default=None, gt=0, le=4)
+    executed: bool = Field(default=False)
+    mission_id: int | None = Field(default=None, gt=0)
+    notes: str | None = Field(default=None, max_length=500)
 
 
 class UpdateTaskRequest(BaseModel):
-    title: str | None = Field(default=None, min_length=3, max_length=100)
+    checklist_item: str | None = Field(default=None, min_length=3, max_length=100)
     description: str | None = Field(default=None, min_length=1, max_length=500)
-    priority: int | None = Field(default=None, gt=0, le=5)
-    completed: bool | None = Field(default=None)
+    criticality: int | None = Field(default=None, gt=0, le=4)
+    executed: bool | None = Field(default=None)
+    mission_id: int | None = Field(default=None, gt=0)
+    notes: str | None = Field(default=None, max_length=500)

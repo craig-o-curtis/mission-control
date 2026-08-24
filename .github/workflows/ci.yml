@@ -62,3 +62,28 @@ jobs:
       - run: uv sync
       - name: Test (all projects)
         run: uv run pytest -v projects/*/tests/
+
+  gui:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: projects/gui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: pnpm
+          cache-dependency-path: projects/gui/pnpm-lock.yaml
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - name: Lint
+        run: pnpm run lint
+      - name: Format check
+        run: pnpm run format:check
+      - name: Type check
+        run: pnpm run check
+      - name: Test
+        run: pnpm run test
+      - name: Build
+        run: pnpm run build

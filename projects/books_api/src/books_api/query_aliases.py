@@ -2,27 +2,30 @@ from typing import Annotated
 
 from fastapi import Query
 
-CategoryQuery = Annotated[
+MissionNameQuery = Annotated[
     str | None,
-    Query(max_length=50, description="The category to filter books by."),
+    Query(max_length=100, description="The mission name to filter missions by."),
 ]
 
-AuthorQuery = Annotated[
+CommanderQuery = Annotated[
     str | None,
-    Query(max_length=100, description="The author to filter books by."),
+    Query(max_length=100, description="The commander to filter missions by."),
 ]
 
-TitleQuery = Annotated[
+MissionTypeQuery = Annotated[
     str | None,
-    Query(max_length=100, description="The title to filter books by."),
+    Query(max_length=50, description="The mission type to filter missions by."),
 ]
 
 DescriptionQuery = Annotated[
     str | None,
-    Query(max_length=100, description="The description to filter books by."),
+    Query(max_length=100, description="The description to filter missions by."),
 ]
 
-RatingQuery = Annotated[
-    int | None,
-    Query(ge=1, le=5, description="The rating to filter books by."),
+PhaseQuery = Annotated[
+    str | None,
+    Query(
+        description="The phase to filter missions by "
+        "(planning/launch/active/complete/archived)."
+    ),
 ]

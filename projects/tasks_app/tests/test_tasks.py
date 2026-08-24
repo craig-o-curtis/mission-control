@@ -29,17 +29,15 @@ class TestReadTask:
         assert isinstance(response.json(), dict)
 
     def test_get_task_not_found(self, api_client: TestClient) -> None:
-        """Verify that a task can be retrieved."""
+        """Verify that a non-existent task returns 404."""
         response = api_client.get("/tasks/999")
         assert response.status_code == 404
-
         assert response.json()["detail"] == "Task not found"
 
     def test_get_task_invalid_id(self, api_client: TestClient) -> None:
-        """Verify that a task can be retrieved."""
+        """Verify that an invalid task id returns 422."""
         response = api_client.get("/tasks/abc")
         assert response.status_code == 422
-
         assert (
             response.json()["detail"][0]["msg"]
             == "Input should be a valid integer, unable to parse string as an integer"
@@ -49,11 +47,11 @@ class TestReadTask:
 class TestCreateTask:
     def test_create_task(self, api_client: TestClient) -> None:
         """Verify that a task can be created."""
-        new_task = {"title": "New Task", "description": "A new task to do."}
+        new_task = {"checklist_item": "New Task", "description": "A new task to do."}
         response = api_client.post("/tasks", json=new_task)
         assert response.status_code == 201
         data = response.json()
-        assert data["title"] == new_task["title"]
+        assert data["checklist_item"] == new_task["checklist_item"]
         assert data["description"] == new_task["description"]
         # Confirm is in the db
         response = api_client.get("/tasks")
@@ -61,25 +59,24 @@ class TestCreateTask:
         assert len(response.json()) == 2
 
     def test_create_task_invalid_data(self, api_client: TestClient) -> None:
-        """Verify that a task can be created."""
+        """Verify that a task without required fields returns 422."""
         desc_only = {"description": "A new task to do."}
         response = api_client.post("/tasks", json=desc_only)
         assert response.status_code == 422
-
         assert response.json()["detail"][0]["msg"] == "Field required"
 
-        priority_only = {"priority": 3}
-        response = api_client.post("/tasks", json=priority_only)
+        criticality_only = {"criticality": 3}
+        response = api_client.post("/tasks", json=criticality_only)
         assert response.status_code == 422
 
-        completed_only = {"completed": False}
-        response = api_client.post("/tasks", json=completed_only)
+        executed_only = {"executed": False}
+        response = api_client.post("/tasks", json=executed_only)
         assert response.status_code == 422
 
         all_optional = {
             "description": "A new task to do.",
-            "priority": 3,
-            "completed": False,
+            "criticality": 3,
+            "executed": False,
         }
         response = api_client.post("/tasks", json=all_optional)
         assert response.status_code == 422
@@ -88,7 +85,10 @@ class TestCreateTask:
 class TestUpdateTask:
     def test_update_task(self, api_client: TestClient) -> None:
         """Verify that a task can be updated."""
-        update_data = {"title": "Updated Task", "description": "An updated task."}
+        update_data = {
+            "checklist_item": "Updated Task",
+            "description": "An updated task.",
+        }
         response = api_client.put("/tasks/1", json=update_data)
         assert response.status_code == 204
         assert response.content == b""  # <-- 204 has no body
@@ -96,23 +96,27 @@ class TestUpdateTask:
         response = api_client.get("/tasks/1")
         assert response.status_code == 200
         data = response.json()
-        assert data["title"] == update_data["title"]
+        assert data["checklist_item"] == update_data["checklist_item"]
         assert data["description"] == update_data["description"]
 
     def test_update_task_not_found(self, api_client: TestClient) -> None:
-        """Verify that a task can be updated."""
-        update_data = {"title": "Updated Task", "description": "An updated task."}
+        """Verify that updating a non-existent task returns 404."""
+        update_data = {
+            "checklist_item": "Updated Task",
+            "description": "An updated task.",
+        }
         response = api_client.put("/tasks/999", json=update_data)
         assert response.status_code == 404
-
         assert response.json()["detail"] == "Task not found"
 
     def test_update_task_invalid_id(self, api_client: TestClient) -> None:
-        """Verify that a task can be updated."""
-        update_data = {"title": "Updated Task", "description": "An updated task."}
+        """Verify that an invalid task id on update returns 422."""
+        update_data = {
+            "checklist_item": "Updated Task",
+            "description": "An updated task.",
+        }
         response = api_client.put("/tasks/abc", json=update_data)
         assert response.status_code == 422
-
         assert (
             response.json()["detail"][0]["msg"]
             == "Input should be a valid integer, unable to parse string as an integer"
@@ -130,7 +134,7 @@ class TestDeleteTask:
         assert response.status_code == 404
 
     def test_delete_task_not_found(self, api_client: TestClient) -> None:
-        """Verify that a task can be deleted."""
+        """Verify that deleting a non-existent task returns 404."""
         response = api_client.delete("/tasks/999")
         assert response.status_code == 404
 
@@ -151,7 +155,7 @@ class TestOwnerIsolation:
 
     def test_user_cannot_update_other_task(self, isolation_client: TestClient) -> None:
         """User 1 should get 404 when trying to update user 2's task."""
-        update_data = {"title": "Hacked"}
+        update_data = {"checklist_item": "Hacked"}
         response = isolation_client.put("/tasks/1", json=update_data)
         assert response.status_code == 404
         assert response.json()["detail"] == "Task not found"
@@ -164,7 +168,7 @@ class TestOwnerIsolation:
 
     def test_partial_update(self, api_client: TestClient) -> None:
         """User can update only some fields of a task."""
-        update_data = {"title": "Updated Title Only"}
+        update_data = {"checklist_item": "Updated Item Only"}
         response = api_client.put("/tasks/1", json=update_data)
         assert response.status_code == 204
 
@@ -177,10 +181,9 @@ class TestOwnerIsolation:
         assert response.json() == []
 
     def test_delete_task_invalid_id(self, api_client: TestClient) -> None:
-        """Verify that a task can be deleted."""
+        """Verify that an invalid task id on delete returns 422."""
         response = api_client.delete("/tasks/abc")
         assert response.status_code == 422
-
         assert (
             response.json()["detail"][0]["msg"]
             == "Input should be a valid integer, unable to parse string as an integer"

@@ -8,12 +8,15 @@ A `uv` workspace containing multiple FastAPI backend projects sharing a common l
 fastapi-backend/
 ├── projects/
 │   ├── books_api/     # Books management API
-│   └── tasks_app/     # Tasks management API (WIP)
+│   ├── tasks_app/     # Tasks management API
+│   └── gui/           # SvelteKit + TypeScript frontend (static SPA)
 ├── libs/
 │   └── shared/        # Shared utilities (api_utils, etc.)
 ├── pyproject.toml     # Workspace root: shared deps, scripts, tool config
 └── .github/workflows/ # CI pipeline
 ```
+
+The `projects/gui` app is a separate Node/npm project (not part of the `uv` workspace). It builds to static files and is served as a SPA — see **Frontend GUI** below.
 
 ## Setup
 
@@ -114,6 +117,155 @@ uv sync
 - `projects/` — individual API projects (src-layout, each with its own `[project.scripts]` entry)
 - `libs/shared/` — shared library code
 - `.agents/skills/` — AI agent skills (quality-check, ape-pr, etc.)
+
+## Frontend GUI (`projects/gui`)
+
+A static SPA built with SvelteKit + TypeScript + Tailwind, using `@sveltejs/adapter-static`
+in SPA mode (no SSR, single `index.html` fallback that serves every client route). It is
+published to GitHub Pages under the `fastapi-endpoints` base path. This is a **separate
+pnpm project** — it is not part of the `uv` workspace above (and uses pnpm, not npm, for
+dependency management).
+
+### Prerequisites
+
+- **Node.js 24+** (enforced via the `engines.node` field and `engine-strict`)
+- **pnpm**, managed by **corepack** — the project pins `pnpm@10.33.2` via the
+  `packageManager` field, so run `corepack enable` once, then use `pnpm` as normal
+  (corepack supplies the pinned version automatically).
+
+### Install dependencies (if starting fresh)
+
+```bash
+cd projects/gui
+pnpm install
+```
+
+### Run the dev server
+
+```bash
+cd projects/gui
+pnpm run dev
+```
+
+Open the URL it prints. By default the app is served at the **site root**, so:
+
+```
+http://localhost:5173/
+```
+
+The GitHub Pages deploy (Phase 6) builds with `BASE_PATH=/fastapi-endpoints` so the
+static site is published under that subpath. To preview that subpath locally, set it:
+
+```bash
+BASE_PATH=/fastapi-endpoints pnpm run dev   # then open http://localhost:5173/fastapi-endpoints/
+```
+
+### Build the static site
+
+```bash
+cd projects/gui
+pnpm run build                   # outputs static files to projects/gui/build/
+```
+
+`BASE_PATH` controls the URL prefix baked into asset links. It defaults to the **root**
+for local use; the GitHub Pages build sets `BASE_PATH=/fastapi-endpoints`. For a local
+build served under that subpath, use `BASE_PATH=/fastapi-endpoints`.
+
+### Serve the built site locally
+
+The `build/` folder is fully static, so any static file server works. Pick one:
+
+```bash
+# Option A: Node (pnpm dlx serve) — works with the default /fastapi-endpoints base
+cd projects/gui/build && pnpm dlx serve
+
+# Option B: Python — build with BASE_PATH='' first, then serve at root
+BASE_PATH='' pnpm run build
+cd projects/gui/build && python3 -m http.server 8080   # open http://localhost:8080/
+```
+
+(With the default base path, a root server won't find the assets; either use `serve`, which
+respects the path, or build with `BASE_PATH=''`.)
+
+### Type-check
+
+```bash
+cd projects/gui
+pnpm run check                  # svelte-check over the TypeScript sources
+```
+
+### Lint & format (Oxc)
+
+The GUI uses [Oxc](https://oxc.rs) — `oxlint` for linting and `oxfmt` for formatting
+(no ESLint/Prettier). These mirror the Python side's `ruff`/`ty` quality gates.
+
+```bash
+cd projects/gui
+pnpm run lint          # oxlint over .ts/.js sources
+pnpm run format        # oxfmt --write (reformats in place)
+pnpm run format:check  # oxfmt --check (CI-friendly, non-zero on diffs)
+```
+
+Config: `.oxlintrc.json` and `.oxfmtrc.json` (both ignore `**/*.svelte`, `build`,
+`.svelte-kit`, `node_modules`, `static`). `.svelte` files are formatted in the editor
+via the `svelte.svelte-vscode` extension (format-on-save is enabled in `.vscode/settings.json`).
+
+### Run from the repo root
+
+A root `package.json` delegates the GUI scripts via `pnpm -C projects/gui`, so you can run
+them from the repository root without `cd`-ing into `projects/gui`:
+
+```bash
+pnpm run dev            # projects/gui: vite dev
+pnpm run build          # projects/gui: vite build  -> projects/gui/build/
+pnpm run preview        # projects/gui: vite preview
+pnpm run check          # projects/gui: svelte-check
+pnpm run lint           # projects/gui: oxlint
+pnpm run format         # projects/gui: oxfmt --write
+pnpm run format:check   # projects/gui: oxfmt --check
+pnpm run test           # projects/gui: vitest run
+```
+
+(These just forward to the matching script in `projects/gui`; the `cd projects/gui && pnpm run …`
+forms above are equivalent.)
+
+### Configuring the backend URLs
+
+The GUI reads its backend base URLs from Vite `PUBLIC_` env vars, defined in
+`projects/gui/src/lib/config.ts`:
+
+```ts
+export const BOOKS_API = import.meta.env.PUBLIC_BOOKS_API ?? "/api";
+export const TASKS_API = import.meta.env.PUBLIC_TASKS_API ?? "/api";
+```
+
+**Local dev needs no URL string.** `vite.config.ts` proxies `/api/*` to the
+locally-running FastAPI backend on port 8000 (override with `API_TARGET` if you run a
+backend elsewhere). So `BOOKS_API` defaults to `/api` and requests like `/api/books`
+are forwarded to `http://127.0.0.1:8000/books`. Both backends default to port 8000,
+so run one at a time locally. The proxy also avoids cross-origin/CORS friction in dev.
+
+For production (GitHub Pages → Render), bake the absolute Render URLs in at build time:
+
+```bash
+PUBLIC_BOOKS_API=https://books-api.onrender.com \
+PUBLIC_TASKS_API=https://tasks-api.onrender.com \
+pnpm run build
+```
+
+Also set each backend's `CORS_ORIGINS` to include the GitHub Pages origin
+(e.g. `https://<user>.github.io`) so the browser can call them cross-origin.
+
+### Deploy to GitHub Pages
+
+`.github/workflows/deploy-gui.yml` builds and publishes the GUI to the `gh-pages`
+branch on every push to `main`. One-time setup:
+
+1. Add repo **Secrets** `BOOKS_API_URL` and `TASKS_API_URL` (the Render URLs).
+2. **Settings → Pages → source: `gh-pages`** branch.
+
+The workflow builds with `BASE_PATH=/fastapi-endpoints` and bakes the above URLs
+into the bundle, so the live site is `https://<user>.github.io/fastapi-endpoints/`.
 
 ## Learning
 

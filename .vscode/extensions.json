@@ -3,6 +3,7 @@
     "charliermarsh.ruff",
     "ms-python.python",
     "ms-python.debugpy",
-    "ms-python.vscode-pylance"
+    "ms-python.vscode-pylance",
+    "svelte.svelte-vscode"
   ]
 }

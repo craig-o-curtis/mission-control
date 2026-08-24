@@ -113,10 +113,10 @@ def fake_admin_user() -> User:
 def fake_task(fake_user: User) -> Task:
     """Create a default task owned by fake_user."""
     return Task(
-        title="Test Task",
+        checklist_item="Test Task",
         description="A test task.",
-        priority=1,
-        completed=False,
+        criticality=1,
+        executed=False,
         owner_id=fake_user.id,
     )
 
@@ -125,10 +125,10 @@ def fake_task(fake_user: User) -> Task:
 def fake_admin_task(fake_admin_user: User) -> Task:
     """Create a default task owned by fake_admin_user."""
     return Task(
-        title="Admin Test Task",
+        checklist_item="Admin Test Task",
         description="A task for admin testing.",
-        priority=2,
-        completed=False,
+        criticality=2,
+        executed=False,
         owner_id=fake_admin_user.id,
     )
 
@@ -137,10 +137,10 @@ def fake_admin_task(fake_admin_user: User) -> Task:
 def fake_second_user_task(fake_second_user: User) -> Task:
     """Create a task owned by fake_second_user for isolation tests."""
     return Task(
-        title="Other User's Task",
+        checklist_item="Other User's Task",
         description="Owned by second user.",
-        priority=1,
-        completed=False,
+        criticality=1,
+        executed=False,
         owner_id=fake_second_user.id,
     )
 
