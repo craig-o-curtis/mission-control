@@ -8,7 +8,7 @@ class TestLogin:
         """Login with valid credentials returns 200 and a token."""
         response = no_auth_client.post(
             "/auth/token",
-            data={"username": "testuser", "password": "fakepass123"},
+            data={"username": "authtest", "password": "fakepass123"},
         )
         assert response.status_code == 200
         data = response.json()
@@ -19,7 +19,7 @@ class TestLogin:
         """Login with wrong password returns 401."""
         response = no_auth_client.post(
             "/auth/token",
-            data={"username": "testuser", "password": "wrongpassword"},
+            data={"username": "authtest", "password": "wrongpassword"},
         )
         assert response.status_code == 401
         assert response.json()["detail"] == "Could not validate user."
@@ -37,6 +37,6 @@ class TestLogin:
         """Login with missing fields returns 422."""
         response = no_auth_client.post(
             "/auth/token",
-            data={"username": "testuser"},
+            data={"username": "authtest"},
         )
         assert response.status_code == 422

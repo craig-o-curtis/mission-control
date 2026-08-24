@@ -55,6 +55,10 @@ class TestCreateTask:
         data = response.json()
         assert data["title"] == new_task["title"]
         assert data["description"] == new_task["description"]
+        # Confirm is in the db
+        response = api_client.get("/tasks")
+        assert response.status_code == 200
+        assert len(response.json()) == 2
 
     def test_create_task_invalid_data(self, api_client: TestClient) -> None:
         """Verify that a task can be created."""
@@ -88,6 +92,12 @@ class TestUpdateTask:
         response = api_client.put("/tasks/1", json=update_data)
         assert response.status_code == 204
         assert response.content == b""  # <-- 204 has no body
+        # Now check db to confirm update
+        response = api_client.get("/tasks/1")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["title"] == update_data["title"]
+        assert data["description"] == update_data["description"]
 
     def test_update_task_not_found(self, api_client: TestClient) -> None:
         """Verify that a task can be updated."""
@@ -115,6 +125,9 @@ class TestDeleteTask:
         response = api_client.delete("/tasks/1")
         assert response.status_code == 204
         assert response.content == b""  # <-- 204 has no body
+        # Now check db to confirm deletion
+        response = api_client.get("/tasks/1")
+        assert response.status_code == 404
 
     def test_delete_task_not_found(self, api_client: TestClient) -> None:
         """Verify that a task can be deleted."""

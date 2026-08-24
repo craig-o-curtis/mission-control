@@ -32,6 +32,12 @@ class TestUpdateCurrentUser:
         data = response.json()
         assert data["first_name"] == "Updated"
         assert data["last_name"] == "User"
+        # Confirm user is in db
+        response = api_client.get("/users/me")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["first_name"] == "Updated"
+        assert data["last_name"] == "User"
 
     def test_user_cannot_change_role(self, api_client: TestClient) -> None:
         """User cannot change their own role."""
@@ -65,7 +71,7 @@ class TestUpdateCurrentUserPhone:
         )
         assert response.status_code == 204
         assert response.content == b""
-
+        # Confirm is in db
         profile = api_client.get("/users/me")
         assert profile.status_code == 200
         assert profile.json()["phone_number"] == "555-4321"
@@ -115,6 +121,10 @@ class TestAdminSelfService:
         assert response.status_code == 200
         data = response.json()
         assert data["first_name"] == "AdminUpdated"
+        # Confirm updated profile
+        profile = admin_client.get("/users/me")
+        assert profile.status_code == 200
+        assert profile.json()["first_name"] == "AdminUpdated"
 
     def test_admin_can_delete_own_account(self, admin_client: TestClient) -> None:
         """Admin can delete own account via /users/me."""
@@ -146,6 +156,11 @@ class TestAdminUserUpdate:
         data = response.json()
         assert data["phone_number"] == "555-9999"
 
+        # Confirm updated phone_number
+        profile = admin_client.get(f"/users/{user_id}")
+        assert profile.status_code == 200
+        assert profile.json()["phone_number"] == "555-9999"
+
 
 class TestPasswordHashing:
     def test_user_password_hashed_on_update(self, api_client: TestClient) -> None:
@@ -153,6 +168,10 @@ class TestPasswordHashing:
         update_data = {"password": "newpassword123"}
         response = api_client.put("/users/me", json=update_data)
         assert response.status_code == 200
+        # Password should not be in response (ReadUserPublic excludes it)
+        data = response.json()
+        assert "password" not in data
+        assert "hashed_password" not in data
 
     def test_admin_password_hashed_on_update(self, admin_client: TestClient) -> None:
         """Admin PUT /users/{id} with password stores hashed value."""
@@ -173,6 +192,10 @@ class TestPasswordHashing:
         update_data = {"password": "newpassword456"}
         response = admin_client.put(f"/users/{user_id}", json=update_data)
         assert response.status_code == 200
+        # Password should not be in response
+        data = response.json()
+        assert "password" not in data
+        assert "hashed_password" not in data
 
     def test_user_update_invalid_data(self, api_client: TestClient) -> None:
         """PUT /users/me with invalid data returns 422."""

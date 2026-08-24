@@ -325,9 +325,9 @@ def admin_client(
 def no_auth_client(test_session) -> Generator[TestClient]:
     """Client with no authentication override — for testing auth/login endpoints."""
     user = User(
-        id=1,
-        username="testuser",
-        email="test@example.com",
+        id=99,
+        username="authtest",
+        email="authtest@example.com",
         hashed_password=_FAKE_HASH,
         is_active=True,
         role="user",
@@ -336,7 +336,7 @@ def no_auth_client(test_session) -> Generator[TestClient]:
     test_session.flush()
     test_session.commit()
 
-    app.state.test_token = _make_token("testuser", 1, "user")
+    app.state.test_token = _make_token("authtest", 99, "user")
 
     def override_get_db():
         yield test_session
