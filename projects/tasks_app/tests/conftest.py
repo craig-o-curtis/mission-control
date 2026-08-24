@@ -1,11 +1,15 @@
 import os
 from collections.abc import Generator
 from typing import Annotated
+from urllib.parse import urlparse
 
+import psycopg
+import pymysql
 import pytest
 from fastapi import Depends
 from fastapi.testclient import TestClient
 from jose import jwt
+from psycopg import sql
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -164,9 +168,63 @@ def test_engine():
     engine.dispose()
 
 
+def _ensure_test_database(database_url: str) -> None:
+    """Create the test database if it doesn't exist (MySQL/Postgres only)."""
+    if database_url.startswith("mysql"):
+        _ensure_mysql_database()
+    elif database_url.startswith("postgresql"):
+        _ensure_postgres_database()
+
+
+def _ensure_mysql_database() -> None:
+
+    parsed = urlparse(TEST_DATABASE_URL)
+    conn = pymysql.connect(
+        host=parsed.hostname or os.getenv("TEST_MYSQL_HOST", "localhost"),
+        port=parsed.port or int(os.getenv("TEST_MYSQL_PORT", "3306")),
+        user=parsed.username or os.getenv("TEST_MYSQL_USER", "root"),
+        password=parsed.password or os.getenv("TEST_MYSQL_PASSWORD", ""),
+    )
+    try:
+        db_name = parsed.path.lstrip("/") or os.getenv(
+            "TEST_MYSQL_DB", "tasks_application_database_test"
+        )
+        with conn.cursor() as cursor:
+            cursor.execute(f"CREATE DATABASE IF NOT EXISTS `{db_name}`")
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _ensure_postgres_database() -> None:
+    parsed = urlparse(TEST_DATABASE_URL)
+    user = parsed.username or os.getenv("TEST_POSTGRES_USER", "postgres")
+    password = parsed.password or os.getenv("TEST_POSTGRES_PASSWORD", "")
+    host = parsed.hostname or os.getenv("TEST_POSTGRES_HOST", "localhost")
+    port = parsed.port or int(os.getenv("TEST_POSTGRES_PORT", "5432"))
+    db_name = parsed.path.lstrip("/") or os.getenv(
+        "TEST_POSTGRES_DB", "TasksApplicationDatabase_test"
+    )
+
+    conn = psycopg.connect(
+        host=host, port=port, user=user, password=password, dbname="postgres"
+    )
+    conn.autocommit = True
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT 1 FROM pg_database WHERE datname = %s", (db_name,))
+            if not cursor.fetchone():
+                cursor.execute(
+                    sql.SQL("CREATE DATABASE {}").format(sql.Identifier(db_name))
+                )
+    finally:
+        conn.close()
+
+
 @pytest.fixture(scope="session")
 def test_tables(test_engine):
     """Create tables once per test session, drop them at the end."""
+    _ensure_test_database(TEST_DATABASE_URL)
     Base.metadata.create_all(bind=test_engine, checkfirst=True)
     yield
     Base.metadata.drop_all(bind=test_engine, checkfirst=True)
@@ -180,20 +238,27 @@ def test_session(test_engine, test_tables):
     )
     session = TestingSessionLocal()
 
-    # Disable FK checks for MySQL during cleanup, then re-enable
-    if TEST_DATABASE_URL.startswith("mysql"):
+    is_mysql = TEST_DATABASE_URL.startswith("mysql")
+    is_postgres = TEST_DATABASE_URL.startswith("postgresql")
+
+    # Disable foreign key checks for MySQL
+    if is_mysql:
         session.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
 
+    # Clear all tables
     for table in reversed(Base.metadata.sorted_tables):
         session.execute(table.delete())
     session.commit()
 
-    if TEST_DATABASE_URL.startswith("mysql"):
+    # Reset auto-increment counters
+    if is_mysql:
         for table in Base.metadata.sorted_tables:
             session.execute(text(f"ALTER TABLE {table.name} AUTO_INCREMENT = 1"))
-        session.commit()
 
-    if TEST_DATABASE_URL.startswith("postgresql"):
+        session.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
+        session.commit()
+    # For PG we need to reset the sequence for each table
+    elif is_postgres:
         for table in Base.metadata.sorted_tables:
             session.execute(
                 text(
@@ -202,10 +267,7 @@ def test_session(test_engine, test_tables):
                 )
             )
         session.commit()
-
-    if TEST_DATABASE_URL.startswith("mysql"):
-        session.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
-
+    # yield session means that
     yield session
     session.close()
 
