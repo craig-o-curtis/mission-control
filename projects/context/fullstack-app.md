@@ -160,27 +160,27 @@ the build has live URLs to point the GUI at. Follow these steps in order.
 10. Click **Create Web Service**. Once **Live**, copy the URL
     (`https://tasks-api-xxxx.onrender.com`).
 
-### Step 0.5 — Seed the database (one time)
+### Step 0.5 — Seed the database (automatic on deploy)
 
-The tasks app needs an admin user (and seeded tasks) before login works.
+The tasks app needs an admin user before login works. Render's **free tier has no
+web shell** (the Shell tab is behind the paid Starter plan), so we seed automatically
+instead of running `scripts/seed.py` by hand.
 
-1. Easiest: open the **Shell** tab on the `tasks-api` service in Render and run:
-   ```
-   uv run python scripts/seed.py
-   ```
-   (It reads the `ADMIN_*` env vars you set and creates the admin + seeded tasks.)
-2. Or run locally with the same env vars pointed at the Render Postgres URL:
-   ```
-   DATABASE_URL=<internal-postgres-url> ADMIN_USER=demo ADMIN_PASSWORD=... \
-   ADMIN_EMAIL=demo@example.com ADMIN_FIRST_NAME=Demo ADMIN_LAST_NAME=User \
-   uv run python scripts/seed.py
-   ```
-3. Verify login works:
-   ```
-   curl -X POST https://tasks-api-xxxx.onrender.com/auth/token \
-     -d "username=demo&password=<your-admin-password>"
-   ```
-   You should get back a JSON token.
+- `tasks_api` now calls `ensure_admin()` in its **lifespan** on every startup
+  (`src/tasks_api/bootstrap.py`). It reads `ADMIN_USER` / `ADMIN_PASSWORD` (and the
+  other `ADMIN_*` vars) and creates the admin user **only if it doesn't already exist**.
+  This runs on each deploy, so the demo always has a login — no Shell needed.
+- `scripts/seed.py` is still available for **local** use (or if you later upgrade to a
+  paid instance and want to run it from the Shell). To seed locally against the Render
+  Postgres, run it with `DATABASE_URL` set to the External URL and the same `ADMIN_*` vars.
+
+After `tasks-api` redeploys with this change, verify login works:
+```
+curl -X POST https://tasks-api-xxxx.onrender.com/auth/token \
+  -d "username=<your-ADMIN_USER>&password=<your-ADMIN_PASSWORD>"
+```
+You should get back a JSON token. (Use the same `ADMIN_USER` / `ADMIN_PASSWORD` you
+set in Step 0.4.)
 
 ### Step 0.6 — Record your URLs
 
