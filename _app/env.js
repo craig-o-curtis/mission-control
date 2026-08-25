@@ -1,0 +1,1 @@
+export const env={PUBLIC_MISSIONS_API:"https://missions-api-ob3e.onrender.com",PUBLIC_CHECKLISTS_API:"https://checklists-api-vljb.onrender.com"}
