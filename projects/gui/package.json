@@ -19,6 +19,9 @@
     "format:check": "oxfmt --check",
     "test": "vitest run"
   },
+  "dependencies": {
+    "@js-temporal/polyfill": "^0.5.1"
+  },
   "devDependencies": {
     "@sveltejs/adapter-auto": "next",
     "@sveltejs/adapter-static": "next",
@@ -37,8 +40,5 @@
   "engines": {
     "node": ">=24"
   },
-  "packageManager": "pnpm@10.33.2",
-  "dependencies": {
-    "@js-temporal/polyfill": "^0.5.1"
-  }
+  "packageManager": "pnpm@10.33.2"
 }
