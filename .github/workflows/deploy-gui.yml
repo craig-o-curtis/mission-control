@@ -37,7 +37,7 @@ jobs:
         run: pnpm run build
         env:
           # Base path for the GitHub Pages project site.
-          BASE_PATH: /fastapi-endpoints
+          BASE_PATH: /mission-control
           # Render URLs for the two backends (repo Secrets).
           PUBLIC_MISSIONS_API: ${{ secrets.MISSIONS_API_URL }}
           PUBLIC_CHECKLISTS_API: ${{ secrets.CHECKLISTS_API_URL }}
