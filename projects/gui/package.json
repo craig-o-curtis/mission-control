@@ -37,5 +37,9 @@
   "engines": {
     "node": ">=24"
   },
-  "packageManager": "pnpm@10.33.2"
+  "packageManager": "pnpm@10.33.2",
+  "dependencies": {
+    "@js-temporal/polyfill": "^0.5.1"
+  }
+}
 }
