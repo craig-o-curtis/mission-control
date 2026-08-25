@@ -1,12 +1,12 @@
 <script lang="ts">
 	const cards = [
 		{
-			href: '/books',
+			href: '/missions',
 			title: 'Mission Control',
 			desc: 'Browse, add, edit and reset the seeded mission collection (in-memory).'
 		},
 		{
-			href: '/tasks',
+			href: '/checklists',
 			title: 'Checklist Ops',
 			desc: 'Log in (JWT) and manage mission checklists, backed by Postgres on Render.'
 		}

@@ -1,19 +1,19 @@
-# FastAPI Backend Projects
+# Mission Control — Fullstack Demo
 
-A `uv` workspace containing multiple FastAPI backend projects sharing a common library.
+A `uv` workspace containing two FastAPI backend projects behind a SvelteKit GUI.
 
 ## Workspace Structure
 
 ```
 fastapi-backend/
 ├── projects/
-│   ├── books_api/     # Books management API
-│   ├── tasks_app/     # Tasks management API
-│   └── gui/           # SvelteKit + TypeScript frontend (static SPA)
+│   ├── missions_api/          # Missions API (in-memory)
+│   ├── mission_control_app/   # Checklists API + Postgres
+│   └── gui/                   # SvelteKit + TypeScript frontend (static SPA)
 ├── libs/
-│   └── shared/        # Shared utilities (api_utils, etc.)
-├── pyproject.toml     # Workspace root: shared deps, scripts, tool config
-└── .github/workflows/ # CI pipeline
+│   └── shared/                # Shared utilities (api_utils, etc.)
+├── pyproject.toml             # Workspace root: shared deps, scripts, tool config
+└── .github/workflows/         # CI pipeline
 ```
 
 The `projects/gui` app is a separate Node/npm project (not part of the `uv` workspace). It builds to static files and is served as a SPA — see **Frontend GUI** below.
@@ -29,8 +29,8 @@ That's it — this installs every project, the shared library, and all dev tools
 ## Running a project
 
 ```bash
-uv run books-api   # starts Books API on http://127.0.0.1:8000 with auto-reload
-uv run tasks-api   # starts Tasks API on http://127.0.0.1:8000 with auto-reload
+uv run missions-api    # starts Missions API on http://127.0.0.1:8000 with auto-reload
+uv run checklists-api  # starts Checklists API on http://127.0.0.1:8000 with auto-reload
 ```
 
 Each project defines a console-script entry point ([project.scripts]), so `uv run <name>` works from anywhere in the repo — no need for `--package` or the full `uvicorn` invocation.
@@ -47,27 +47,27 @@ uv run ruff format --check .           # format-check everything
 uv run ty check projects/ libs/        # type-check everything
 ```
 
-Tests default to an in-memory SQLite database. To run the tasks_app test suite against a real database, set `TEST_DATABASE_URL`:
+Tests default to an in-memory SQLite database. To run the checklists test suite against a real database, set `TEST_DATABASE_URL`:
 
 ```bash
 # Postgres
-TEST_DATABASE_URL=postgresql+psycopg://postgres:<.env.TEST_POSTGRES_PASSWORD>@localhost:5432/TasksApplicationDatabase uv run pytest projects/tasks_app/tests/ -v
+TEST_DATABASE_URL=postgresql+psycopg://postgres:<.env.TEST_POSTGRES_PASSWORD>@localhost:5432/mission_control_database uv run pytest projects/mission_control_app/tests/ -v
 
 # MySQL
-TEST_DATABASE_URL=mysql+pymysql://root:<.env.MYSQL_ROOT_PASSWORD>@localhost:3306/tasks_application_database uv run pytest projects/tasks_app/tests/ -v
+TEST_DATABASE_URL=mysql+pymysql://root:<.env.MYSQL_ROOT_PASSWORD>@localhost:3306/mission_control_database uv run pytest projects/mission_control_app/tests/ -v
 ```
 
 To scope to a single project:
 
 ```bash
-uv run pytest -v projects/books_api/tests/
-uv run ruff check projects/books_api/src/
-uv run ty check projects/books_api/src/
+uv run pytest -v projects/missions_api/tests/
+uv run ruff check projects/missions_api/src/
+uv run ty check projects/missions_api/src/
 ```
 
 ## Adding a New Project
 
-1. Create a new directory under `projects/` using the src-layout, matching `books_api`:
+1. Create a new directory under `projects/` using the src-layout, matching `missions_api`:
 
    ```text
    projects/new_api/
@@ -94,8 +94,8 @@ uv run ty check projects/books_api/src/
 
 ```bash
 # Add/remove a dependency for one project
-uv add httpx --package books-api
-uv remove httpx --package books-api
+uv add httpx --package missions-api
+uv remove httpx --package missions-api
 
 # Add/remove a dev-only tool (shared across the whole workspace)
 uv add --dev some-tool
@@ -122,7 +122,7 @@ uv sync
 
 A static SPA built with SvelteKit + TypeScript + Tailwind, using `@sveltejs/adapter-static`
 in SPA mode (no SSR, single `index.html` fallback that serves every client route). It is
-published to GitHub Pages under the `fastapi-endpoints` base path. This is a **separate
+published to GitHub Pages under the `mission-control` base path. This is a **separate
 pnpm project** — it is not part of the `uv` workspace above (and uses pnpm, not npm, for
 dependency management).
 
@@ -153,11 +153,11 @@ Open the URL it prints. By default the app is served at the **site root**, so:
 http://localhost:5173/
 ```
 
-The GitHub Pages deploy (Phase 6) builds with `BASE_PATH=/fastapi-endpoints` so the
+The GitHub Pages deploy (Phase 6) builds with `BASE_PATH=/mission-control` so the
 static site is published under that subpath. To preview that subpath locally, set it:
 
 ```bash
-BASE_PATH=/fastapi-endpoints pnpm run dev   # then open http://localhost:5173/fastapi-endpoints/
+BASE_PATH=/mission-control pnpm run dev   # then open http://localhost:5173/mission-control/
 ```
 
 ### Build the static site
@@ -168,15 +168,15 @@ pnpm run build                   # outputs static files to projects/gui/build/
 ```
 
 `BASE_PATH` controls the URL prefix baked into asset links. It defaults to the **root**
-for local use; the GitHub Pages build sets `BASE_PATH=/fastapi-endpoints`. For a local
-build served under that subpath, use `BASE_PATH=/fastapi-endpoints`.
+for local use; the GitHub Pages build sets `BASE_PATH=/mission-control`. For a local
+build served under that subpath, use `BASE_PATH=/mission-control`.
 
 ### Serve the built site locally
 
 The `build/` folder is fully static, so any static file server works. Pick one:
 
 ```bash
-# Option A: Node (pnpm dlx serve) — works with the default /fastapi-endpoints base
+# Option A: Node (pnpm dlx serve) — works with the default /mission-control base
 cd projects/gui/build && pnpm dlx serve
 
 # Option B: Python — build with BASE_PATH='' first, then serve at root
@@ -235,21 +235,21 @@ The GUI reads its backend base URLs from Vite `PUBLIC_` env vars, defined in
 `projects/gui/src/lib/config.ts`:
 
 ```ts
-export const BOOKS_API = import.meta.env.PUBLIC_BOOKS_API ?? "/api";
-export const TASKS_API = import.meta.env.PUBLIC_TASKS_API ?? "/api";
+export const MISSIONS_API = import.meta.env.PUBLIC_MISSIONS_API ?? "/api";
+export const CHECKLISTS_API = import.meta.env.PUBLIC_CHECKLISTS_API ?? "/api";
 ```
 
 **Local dev needs no URL string.** `vite.config.ts` proxies `/api/*` to the
 locally-running FastAPI backend on port 8000 (override with `API_TARGET` if you run a
-backend elsewhere). So `BOOKS_API` defaults to `/api` and requests like `/api/books`
-are forwarded to `http://127.0.0.1:8000/books`. Both backends default to port 8000,
+backend elsewhere). So `MISSIONS_API` defaults to `/api` and requests like `/api/missions`
+are forwarded to `http://127.0.0.1:8000/missions`. Both backends default to port 8000,
 so run one at a time locally. The proxy also avoids cross-origin/CORS friction in dev.
 
 For production (GitHub Pages → Render), bake the absolute Render URLs in at build time:
 
 ```bash
-PUBLIC_BOOKS_API=https://books-api.onrender.com \
-PUBLIC_TASKS_API=https://tasks-api.onrender.com \
+PUBLIC_MISSIONS_API=https://missions-api.onrender.com \
+PUBLIC_CHECKLISTS_API=https://checklists-api.onrender.com \
 pnpm run build
 ```
 
@@ -261,11 +261,11 @@ Also set each backend's `CORS_ORIGINS` to include the GitHub Pages origin
 `.github/workflows/deploy-gui.yml` builds and publishes the GUI to the `gh-pages`
 branch on every push to `main`. One-time setup:
 
-1. Add repo **Secrets** `BOOKS_API_URL` and `TASKS_API_URL` (the Render URLs).
+1. Add repo **Secrets** `MISSIONS_API_URL` and `CHECKLISTS_API_URL` (the Render URLs).
 2. **Settings → Pages → source: `gh-pages`** branch.
 
-The workflow builds with `BASE_PATH=/fastapi-endpoints` and bakes the above URLs
-into the bundle, so the live site is `https://<user>.github.io/fastapi-endpoints/`.
+The workflow builds with `BASE_PATH=/mission-control` and bakes the above URLs
+into the bundle, so the live site is `https://<user>.github.io/mission-control/`.
 
 ## Learning
 

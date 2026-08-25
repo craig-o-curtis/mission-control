@@ -11,8 +11,8 @@ declare global {
 }
 
 interface ImportMetaEnv {
-  readonly PUBLIC_BOOKS_API?: string;
-  readonly PUBLIC_TASKS_API?: string;
+  readonly PUBLIC_MISSIONS_API?: string;
+  readonly PUBLIC_CHECKLISTS_API?: string;
 }
 
 interface ImportMeta {

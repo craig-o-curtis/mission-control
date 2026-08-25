@@ -3,8 +3,8 @@ name = "fastapi-backend"
 version = "0.1.0"
 requires-python = ">=3.14"
 dependencies = [
-    "books-api",
-    "tasks-api",
+    "missions-api",
+    "checklists-api",
 ]
 
 [dependency-groups]
@@ -18,12 +18,12 @@ dev = [
 ]
 
 [tool.uv.workspace]
-members = ["projects/books_api", "projects/tasks_app", "libs/shared"]
+members = ["projects/missions_api", "projects/mission_control_app", "libs/shared"]
 
 [tool.uv.sources]
 shared = { workspace = true }
-books-api = { workspace = true }
-tasks-api = { workspace = true }
+missions-api = { workspace = true }
+checklists-api = { workspace = true }
 
 [tool.ruff]
 target-version = "py314"

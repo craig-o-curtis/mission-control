@@ -56,10 +56,10 @@ uv run pytest -v projects/*/tests/ libs/*/tests/
 **FAIL case:** one line per failed gate, quote shortest decisive error only. No full stack traces unless asked.
 
 Examples:
-- `Lint: FAIL — projects/books_api/books.py:42: E501 line too long (120 > 88)`
-- `Format: FAIL — projects/books_api/models.py not formatted`
-- `Typecheck: FAIL — projects/books_api/books.py:15: error: unused import "Response"`
-- `Tests: FAIL — projects/books_api/tests/test_books.py::TestReadBooks::test_filter_By_query_Params FAILED (assert 3 == 2)`
+- `Lint: FAIL — projects/missions_api/missions.py:42: E501 line too long (120 > 88)`
+- `Format: FAIL — projects/missions_api/models.py not formatted`
+- `Typecheck: FAIL — projects/missions_api/missions.py:15: error: unused import "Response"`
+- `Tests: FAIL — projects/missions_api/tests/test_missions.py::TestReadMissions::test_filter_By_query_Params FAILED (assert 3 == 2)`
 
 ## Rules
 

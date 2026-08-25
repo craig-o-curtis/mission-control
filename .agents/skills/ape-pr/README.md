@@ -31,8 +31,8 @@ Add GET /users/:id/profile endpoint. Mobile client needs profile data without fu
 
 ## Changes
 
-- Add `BookBase`, `Book`, `BookCreate`, `BookUpdate` models with shared fields
-- Add description and rating fields to book schema
+- Add `MissionBase`, `Mission`, `MissionCreate`, `MissionUpdate` models with shared fields
+- Add description and rating fields to mission schema
 - Add query filters: description, rating
 - Update tests: filter params, validation edge cases, null clearing on update
 - Add CI workflow: lint, format, type check, test
@@ -41,7 +41,7 @@ Add GET /users/:id/profile endpoint. Mobile client needs profile data without fu
 
 ## Test plan
 
-Run `uv run pytest -v tests/`. Run `uv run ruff check books_api/ tests/`. Run `uv run ty check books_api/ tests/`.
+Run `uv run pytest -v tests/`. Run `uv run ruff check missions_api/ tests/`. Run `uv run ty check missions_api/ tests/`.
 
 </environment_details>
 ```

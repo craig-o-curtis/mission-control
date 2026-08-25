@@ -18,7 +18,7 @@ The ASGI (Asynchronous Server Gateway Interface) server. This is what actually r
 
 - **What it does:** Acts as the bridge between the internet and your Python code. It receives HTTP requests, passes them to FastAPI, and sends back responses.
 - **Why it's used:** FastAPI is a framework, not a server. Uvicorn is the most popular ASGI server for Python and is built on `uvloop` for high performance.
-- **How it runs:** `uvicorn books_api.main:app --reload` starts the server in development mode with auto-reload.
+- **How it runs:** `uvicorn missions_api.main:app --reload` starts the server in development mode with auto-reload.
 
 ### [HTTPX](https://www.python-httpx.org/)
 
@@ -137,7 +137,7 @@ The testing framework. The most popular Python testing library.
 - **Commands:**
   - `pytest` — run all tests
   - `pytest -v` — verbose output
-  - `pytest tests/test_books.py` — run specific test file
+  - `pytest tests/test_missions.py` — run specific test file
 
 ### [pytest-asyncio](https://pytest-asyncio.readthedocs.io/)
 

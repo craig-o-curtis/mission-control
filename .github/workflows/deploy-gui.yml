@@ -39,8 +39,8 @@ jobs:
           # Base path for the GitHub Pages project site.
           BASE_PATH: /fastapi-endpoints
           # Render URLs for the two backends (repo Secrets).
-          PUBLIC_BOOKS_API: ${{ secrets.BOOKS_API_URL }}
-          PUBLIC_TASKS_API: ${{ secrets.TASKS_API_URL }}
+          PUBLIC_MISSIONS_API: ${{ secrets.MISSIONS_API_URL }}
+          PUBLIC_CHECKLISTS_API: ${{ secrets.CHECKLISTS_API_URL }}
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4

@@ -1,6 +1,6 @@
-import { BOOKS_API, TASKS_API } from "./config";
+import { MISSIONS_API, CHECKLISTS_API } from "./config";
 
-export interface Book {
+export interface Mission {
   id: number;
   mission_name: string;
   commander: string;
@@ -12,7 +12,7 @@ export interface Book {
   seeded: boolean;
 }
 
-export interface BookInput {
+export interface MissionInput {
   mission_name: string;
   commander: string;
   mission_type: string;
@@ -22,7 +22,7 @@ export interface BookInput {
   launch_date?: string | null;
 }
 
-export interface Task {
+export interface ChecklistItem {
   id: number;
   checklist_item: string;
   description: string | null;
@@ -33,7 +33,7 @@ export interface Task {
   seeded: boolean;
 }
 
-export interface TaskInput {
+export interface ChecklistItemInput {
   checklist_item: string;
   description?: string | null;
   criticality?: number | null;
@@ -66,8 +66,8 @@ async function parseError(res: Response): Promise<ApiError> {
   return new ApiError(res.status, detail);
 }
 
-async function booksReq(path: string, init?: RequestInit): Promise<Response> {
-  const res = await fetch(`${BOOKS_API}${path}`, {
+async function missionsReq(path: string, init?: RequestInit): Promise<Response> {
+  const res = await fetch(`${MISSIONS_API}${path}`, {
     headers: { "Content-Type": "application/json" },
     ...init,
   });
@@ -75,27 +75,27 @@ async function booksReq(path: string, init?: RequestInit): Promise<Response> {
   return res;
 }
 
-export const booksApi = {
-  list: async (): Promise<Book[]> => (await booksReq("/books")).json(),
-  create: async (input: BookInput): Promise<Book> =>
-    (await booksReq("/books", { method: "POST", body: JSON.stringify(input) })).json(),
-  update: async (id: number, input: Partial<BookInput>): Promise<Book> =>
+export const missionsApi = {
+  list: async (): Promise<Mission[]> => (await missionsReq("/missions")).json(),
+  create: async (input: MissionInput): Promise<Mission> =>
+    (await missionsReq("/missions", { method: "POST", body: JSON.stringify(input) })).json(),
+  update: async (id: number, input: Partial<MissionInput>): Promise<Mission> =>
     (
-      await booksReq(`/books/${id}`, {
+      await missionsReq(`/missions/${id}`, {
         method: "PUT",
         body: JSON.stringify(input),
       })
     ).json(),
   remove: async (id: number): Promise<void> => {
-    await booksReq(`/books/${id}`, { method: "DELETE" });
+    await missionsReq(`/missions/${id}`, { method: "DELETE" });
   },
   reset: async (): Promise<void> => {
-    await booksReq("/books/reset", { method: "POST" });
+    await missionsReq("/missions/reset", { method: "POST" });
   },
 };
 
-async function tasksReq(path: string, token: string, init?: RequestInit): Promise<Response> {
-  const res = await fetch(`${TASKS_API}${path}`, {
+async function checklistsReq(path: string, token: string, init?: RequestInit): Promise<Response> {
+  const res = await fetch(`${CHECKLISTS_API}${path}`, {
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
@@ -106,10 +106,10 @@ async function tasksReq(path: string, token: string, init?: RequestInit): Promis
   return res;
 }
 
-export const tasksApi = {
+export const checklistsApi = {
   login: async (username: string, password: string): Promise<string> => {
     const body = new URLSearchParams({ username, password });
-    const res = await fetch(`${TASKS_API}/auth/token`, {
+    const res = await fetch(`${CHECKLISTS_API}/auth/token`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body,
@@ -118,26 +118,27 @@ export const tasksApi = {
     const data = (await res.json()) as { access_token: string };
     return data.access_token;
   },
-  // The tasks collection route is registered as `/tasks/` (trailing slash), so we
+  // The checklists collection route is registered as `/checklists/` (trailing slash), so we
   // call it with the slash to avoid a 307 redirect that breaks the SPA fetch.
-  list: async (token: string): Promise<Task[]> => (await tasksReq("/tasks/", token)).json(),
-  create: async (token: string, input: TaskInput): Promise<Task> =>
+  list: async (token: string): Promise<ChecklistItem[]> =>
+    (await checklistsReq("/checklists/", token)).json(),
+  create: async (token: string, input: ChecklistItemInput): Promise<ChecklistItem> =>
     (
-      await tasksReq("/tasks/", token, {
+      await checklistsReq("/checklists/", token, {
         method: "POST",
         body: JSON.stringify(input),
       })
     ).json(),
-  update: async (token: string, id: number, input: Partial<TaskInput>): Promise<void> => {
-    await tasksReq(`/tasks/${id}`, token, {
+  update: async (token: string, id: number, input: Partial<ChecklistItemInput>): Promise<void> => {
+    await checklistsReq(`/checklists/${id}`, token, {
       method: "PUT",
       body: JSON.stringify(input),
     });
   },
   remove: async (token: string, id: number): Promise<void> => {
-    await tasksReq(`/tasks/${id}`, token, { method: "DELETE" });
+    await checklistsReq(`/checklists/${id}`, token, { method: "DELETE" });
   },
   reset: async (token: string): Promise<void> => {
-    await tasksReq("/admin/tasks/reset", token, { method: "POST" });
+    await checklistsReq("/admin/checklists/reset", token, { method: "POST" });
   },
 };
