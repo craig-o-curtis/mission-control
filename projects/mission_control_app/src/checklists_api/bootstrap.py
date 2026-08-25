@@ -6,8 +6,13 @@ items) automatically on boot. Safe to run on every deploy — it only
 inserts what is missing.
 """
 
-import os
-
+from checklists_api.config import (
+    ADMIN_EMAIL,
+    ADMIN_FIRST_NAME,
+    ADMIN_LAST_NAME,
+    ADMIN_PASSWORD,
+    ADMIN_USER,
+)
 from checklists_api.database import SessionLocal
 from checklists_api.models.checklist_item import ChecklistItem
 from checklists_api.models.user import User
@@ -17,14 +22,8 @@ from checklists_api.seed_checklists import SEEDED_CHECKLISTS
 
 def ensure_admin() -> User | None:
     """Create the demo admin user from env vars if it does not exist yet."""
-    username = os.getenv("ADMIN_USER")
-    password = os.getenv("ADMIN_PASSWORD")
-    if not username or not password:
-        return None
-
-    email = os.getenv("ADMIN_EMAIL", "admin@example.com")
-    first_name = os.getenv("ADMIN_FIRST_NAME", "Admin")
-    last_name = os.getenv("ADMIN_LAST_NAME", "User")
+    username = ADMIN_USER
+    password = ADMIN_PASSWORD
 
     db = SessionLocal()
     try:
@@ -33,9 +32,9 @@ def ensure_admin() -> User | None:
             return user
         user = User(
             username=username,
-            email=email,
-            first_name=first_name,
-            last_name=last_name,
+            email=ADMIN_EMAIL,
+            first_name=ADMIN_FIRST_NAME,
+            last_name=ADMIN_LAST_NAME,
             phone_number="555-0000",
             hashed_password=bcrypt_context.hash(password),
             is_active=True,

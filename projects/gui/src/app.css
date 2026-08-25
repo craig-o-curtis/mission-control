@@ -1,1 +1,74 @@
 @import "tailwindcss";
+
+@theme {
+  --color-lcars-black: #000000;
+  --color-lcars-bg: #111122;
+  --color-lcars-panel: #1a1a2e;
+  --color-lcars-orange: #ff9c00;
+  --color-lcars-blue: #5c8cbf;
+  --color-lcars-purple: #cc99cc;
+  --color-lcars-yellow: #ffcc66;
+  --color-lcars-red: #cc6666;
+  --color-lcars-teal: #669999;
+  --color-lcars-cream: #ffe6cc;
+}
+
+body {
+  background-color: #000000;
+  color: #ffe6cc;
+  font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+}
+
+@utility lcars-curve-left {
+  border-top-left-radius: 40px;
+  border-bottom-left-radius: 40px;
+}
+
+@utility lcars-curve-right {
+  border-top-right-radius: 40px;
+  border-bottom-right-radius: 40px;
+}
+
+@utility lcars-pill {
+  border-radius: 9999px;
+}
+
+@utility lcars-btn {
+  border-radius: 9999px;
+  padding: 0.5rem 1.5rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: all 0.15s;
+}
+
+@utility lcars-card {
+  border-top-left-radius: 40px;
+  border-bottom-left-radius: 40px;
+  border-left-width: 8px;
+  padding: 1.5rem;
+}
+
+@utility lcars-input {
+  border-radius: 0.25rem;
+  background-color: var(--color-lcars-panel);
+  padding: 0.5rem 1rem;
+  color: var(--color-lcars-cream);
+  outline: none;
+
+  &:focus {
+    box-shadow: 0 0 0 2px var(--color-lcars-orange);
+  }
+}
+
+@utility lcars-select {
+  border-radius: 0.25rem;
+  background-color: var(--color-lcars-panel);
+  padding: 0.5rem 1rem;
+  color: var(--color-lcars-cream);
+  outline: none;
+
+  &:focus {
+    box-shadow: 0 0 0 2px var(--color-lcars-orange);
+  }
+}
