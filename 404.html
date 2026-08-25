@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Mission Control</title>
+    <script>
+      // GitHub Pages SPA fallback: preserve the path across the redirect.
+      const base = '/mission-control';
+      sessionStorage.setItem('redirect', window.location.pathname.slice(base.length));
+      window.location.href = base + '/';
+    </script>
+  </head>
+  <body></body>
+</html>
