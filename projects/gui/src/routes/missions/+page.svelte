@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { missionsApi, type Mission, type MissionInput } from '$lib/api';
+	import { missionsApi, type Mission, type MissionInput } from '#lib/api.js';
 
 	let missions = $state<Mission[]>([]);
 	let error = $state<string | null>(null);

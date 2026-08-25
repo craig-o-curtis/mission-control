@@ -8,7 +8,7 @@
 // For production (GitHub Pages → Render) set these via PUBLIC_ env vars at
 // build time. SvelteKit's `$env/dynamic/public` bakes them into the static
 // bundle. Missing values fall back to the dev proxy (`/api`).
-import { env } from "$env/dynamic/public";
+import { PUBLIC_MISSIONS_API, PUBLIC_CHECKLISTS_API } from "$app/env/public";
 
-export const MISSIONS_API: string = env.PUBLIC_MISSIONS_API || "/api";
-export const CHECKLISTS_API: string = env.PUBLIC_CHECKLISTS_API || "/api";
+export const MISSIONS_API: string = PUBLIC_MISSIONS_API || "/api";
+export const CHECKLISTS_API: string = PUBLIC_CHECKLISTS_API || "/api";

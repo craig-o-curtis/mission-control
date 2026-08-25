@@ -1,14 +1,14 @@
 <script lang="ts">
-	import { base } from '$app/paths';
+	import { resolve } from '$app/paths';
 
 	const cards = [
 		{
-			href: `${base}/missions`,
+			href: resolve(`missions`),
 			title: 'Mission Control',
 			desc: 'Browse, add, edit and reset the seeded mission collection (in-memory).'
 		},
 		{
-			href: `${base}/checklists`,
+			href: resolve(`checklists`),
 			title: 'Checklist Ops',
 			desc: 'Log in (JWT) and manage mission checklists, backed by Postgres on Render.'
 		}

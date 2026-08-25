@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { checklistsApi, type ChecklistItem, type ChecklistItemInput } from '$lib/api';
+	import { checklistsApi, type ChecklistItem, type ChecklistItemInput } from '#lib/api.js';
 
 	let token = $state<string | null>(null);
 	let checklistItems = $state<ChecklistItem[]>([]);
