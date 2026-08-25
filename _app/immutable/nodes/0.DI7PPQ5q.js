@@ -1,1 +1,0 @@
-import{M as e,b as t,g as n,x as r}from"../chunks/WAYQocV_.js";function i(i,a){var o=r(),s=e(o);n(s,()=>a.children),t(i,o)}export{i as component};
