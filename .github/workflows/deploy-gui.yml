@@ -19,10 +19,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Enable corepack
+        run: corepack enable
+
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
-          pnpm: true
           cache: pnpm
           cache-dependency-path: projects/gui/pnpm-lock.yaml
 
