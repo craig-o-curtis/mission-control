@@ -5,7 +5,7 @@ A `uv` workspace containing two FastAPI backend projects behind a SvelteKit GUI.
 ## Workspace Structure
 
 ```
-fastapi-backend/
+mission-control/
 ├── projects/
 │   ├── missions_api/          # Missions API (in-memory)
 │   ├── mission_control_app/   # Checklists API + Postgres
